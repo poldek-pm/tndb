@@ -13,7 +13,7 @@ libtndb_la_SOURCES = write.c read.c tndb.c tndb_int.h
 pkgincludedir = $(includedir)/tndb
 pkginclude_HEADERS = tndb.h
 
-EXTRA_DIST = Makefile.extra
+EXTRA_DIST = Makefile.extra tndb.sym
 
 EXTRA_PROGRAMS = test_tndb tndb_dump
 test_tndb_LDADD = libtndb.la
