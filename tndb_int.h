@@ -75,6 +75,7 @@ int tndb_hent_cmp_store(const struct tndb_hent *h1, struct tndb_hent *h2);
 #define TNDB_R_HTT_LOADED  (1 << 2)
 #define TNDB_R_SIGN_VRFIED (1 << 3)
 
+#define TNDB_R_UNLINKED    (1 << 10)
 struct tndb {
     unsigned                 rflags; /* runtime flags */
     char                     *path;
