@@ -1,0 +1,38 @@
+# $Id$
+
+PROJ_DIR=$(shell pwd)
+
+mclean: 
+	@if [ -f Makefile ]; then         \
+		$(MAKE) maintainer-clean; \
+	fi
+
+
+backup:
+	@cd $(PROJ_DIR);                                            \
+	NAME=`basename  $(PROJ_DIR)`;                               \
+	ARCHDIR=$$NAME-ARCH;                                        \
+	ARCHNAME=$$NAME-`date +%Y.%m.%d-%H.%M`;                     \
+	mkdir -p ../$$ARCHDIR/$$ARCHNAME/$$NAME;                    \
+	cp -a . ../$$ARCHDIR/$$ARCHNAME/$$NAME || exit 1;           \
+	cd ../$$ARCHDIR;                                            \
+	tar --bzip2 -cpf $$ARCHNAME.tar.bz2 $$ARCHNAME && rm -rf $$ARCHNAME;    \
+	md5sum $$ARCHNAME.tar.bz2 > $$ARCHNAME.md5;                 \
+	ARCHIVE=$(PROJ_DIR)/../$$ARCHDIR/$$ARCHNAME.tar.bz2;        \
+	ARCHIVE_MD5=$(PROJ_DIR)/../$$ARCHDIR/$$ARCHNAME.md5;        \
+	if [ $(cparch)x = "1x" ]; then                              \
+	        mkdir $(backupdir)/copy || true;                    \
+		cp -v $$ARCHIVE $$ARCHIVE_MD5 $(backupdir);         \
+		cp -v $$ARCHIVE $$ARCHIVE_MD5 $(backupdir)/copy;    \
+		cd $(backupdir) || exit 1;                          \
+		md5sum --check $$ARCHIVE_MD5;                       \
+		cd copy || exit 1;                                  \
+		md5sum --check $$ARCHIVE_MD5;                       \
+	fi;                                                         \
+	md5sum --check $$ARCHIVE_MD5
+
+arch : mclean backup 
+
+misarch: mclean
+	$(MAKE) -C . backup cparch=1 backupdir=/z
+

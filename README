@@ -1,0 +1,32 @@
+# $Id$ 
+
+tndb is a tiny library for creating and reading constant databases
+with key/data data pairs. Main features:
+
+* low overhead: 
+  - database header size is about 30 bytes
+  - 5 extra bytes per record (key length is limited to 256 bytes) 
+
+* compressed (gzipped) databases are handled transparently 
+
+* built-in data integrity verification - file's digest is computed 
+  during database creation and could be verified before opening database
+  for reading. 
+
+
+Copyright (C) 2002 Pawel A. Gajda
+tndb is free software; you can redistribute it and/or modify it under 
+the terms of the GNU Library General Public License, version 2 as
+published by the Free Software Foundation (see file COPYING for details).
+
+You should have received a copy of the GNU Library General Public
+License along with this library; if not, write to the Free Software 
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307 USA.
+
+
+
+                                 
+
+
+
+
