@@ -26,3 +26,5 @@ libtool
 *.la
 autom4te.cache
 stamp-h1
+test_tndb
+tndb_dump
