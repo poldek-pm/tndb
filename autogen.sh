@@ -24,5 +24,7 @@ runcmd autoheader
 runcmd automake --add-missing --no-force
 runcmd autoconf
 
-CONFOPTS="--enable-maintainer-mode --enable-compile-warnings $@"
-runcmd ./configure $CONFOPTS
+if [ -z "$1" -o "$1" != "--no-configure" ]; then
+	CONFOPTS="--enable-maintainer-mode --enable-compile-warnings $@"
+	runcmd ./configure $CONFOPTS
+fi

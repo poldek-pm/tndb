@@ -9,7 +9,6 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_RANLIB
 AM_CONFIG_HEADER(config.h)
-#AC_DISABLE_SHARED
 AM_PROG_LIBTOOL
 
 AM_CFLAGS="-Wall -W"
@@ -25,7 +24,7 @@ AC_C_CONST
 AC_TYPE_SIZE_T
 
 dnl Checks for library functions.
-AC_CHECK_FUNCS(strdup strspn mkstemp)
+AC_CHECK_FUNCS(mkstemp)
 
 AC_CHECK_FUNCS(EVP_DigestInit,,
 	[AC_CHECK_LIB(crypto, EVP_DigestInit,,
@@ -34,19 +33,14 @@ AC_CHECK_FUNCS(EVP_DigestInit,,
 
 AC_CHECK_LIB(z, gzopen)
 
-
 dnl use local ../trurlib copy if it exists
 CONF_IN_LDFLAGS=
 if test -f "../trurlib/include/trurl/trurl.h"; then
 	AC_MSG_CHECKING(for local trurlib copy in ../trurlib)
 	AC_MSG_RESULT([yes])
-	TRURL_INCLUDE="-I\$(top_srcdir)/../trurlib/include/"
-	TRURL_LDFLAG="-L\$(top_srcdir)/../trurlib"
-	TRURL_LDFLAG=""
-	AC_SUBST(TRURL_INCLUDE)
-	AC_SUBST(TRURL_LDFLAG)
-	#LDFLAGS="$LDFLAGS -L../trurlib"
-	LIBS="$LIBS ../trurlib/libtrurl.la"
+	CPPFLAGS="$CPPFLAGS -I\$(top_srcdir)/../trurlib/include/"
+	LDFLAGS="$LDFLAGS -L\$(top_srcdir)/../trurlib"
+	LIBS="$LIBS -ltrurl"
 else 
 	AC_CHECK_HEADER(trurl/trurl.h,,AC_MSG_ERROR("trurl.h is missing"))
 	AC_CHECK_LIB(trurl, n_cfree)

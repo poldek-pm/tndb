@@ -1,25 +1,22 @@
 # $Id$
 
 AUTOMAKE_OPTIONS = foreign
-INCLUDES  = @TRURL_INCLUDE@
-LDFLAGS   = @LDFLAGS@
 AM_CFLAGS = @AM_CFLAGS@
 
 # use libtool versioning 
 TNDB_VERINFO   = 0:0:0
 
 lib_LTLIBRARIES  = libtndb.la
-libtndb_la_LDFLAGS = -version-info $(TNDB_VERINFO)
+libtndb_la_LDFLAGS = -version-info $(TNDB_VERINFO) -export-symbols tndb.sym
 
 libtndb_la_SOURCES = write.c read.c tndb.c tndb_int.h
-
 pkgincludedir = $(includedir)/tndb
 pkginclude_HEADERS = tndb.h
 
 EXTRA_DIST = Makefile.extra
 
 EXTRA_PROGRAMS = test_tndb tndb_dump
-test_tndb_LDADD = libtndb.la @TRURL_LDFLAG@ -ltrurl
+test_tndb_LDADD = libtndb.la
 tndb_dump_LDADD = $(test_tndb_LDADD)
 
 MAINTAINERCLEANFILES =	mkinstalldirs install-sh missing *.tar.gz *.spec \
