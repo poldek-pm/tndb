@@ -387,7 +387,7 @@ int tndb_verify(struct tndb *db)
     return rc;
 }
 
-struct tndb *tndb_incref(struct tndb *db)
+struct tndb *tndb_ref(struct tndb *db)
 {
     db->_refcnt++;
     return db;

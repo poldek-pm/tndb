@@ -48,7 +48,7 @@ int tndb_close(struct tndb *db);
 
 int tndb_verify(struct tndb *db);
 
-struct tndb *tndb_incref(struct tndb *db);
+struct tndb *tndb_ref(struct tndb *db);
 tn_stream *tndb_tn_stream(const struct tndb *db);
 const char *tndb_path(const struct tndb *db);
 
