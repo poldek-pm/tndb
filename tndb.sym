@@ -17,3 +17,4 @@ tndb_it_get_voff
 tndb_it_get_begin
 tndb_it_get_end
 tndb_keys
+tndb_unlink

@@ -46,6 +46,9 @@ struct tndb *tndb_dopen(int fd, const char *path);
 
 int tndb_close(struct tndb *db);
 
+/* unlinks && _closes_ db */
+int tndb_unlink(struct tndb *db);
+
 int tndb_verify(struct tndb *db);
 
 struct tndb *tndb_ref(struct tndb *db);

@@ -349,3 +349,20 @@ int tndb_close(struct tndb *db)
     tndb_free(db);
     return 1;
 }
+
+
+int tndb_unlink(struct tndb *db)
+{
+    struct stat st;
+    
+    if (db->_refcnt > 0) {
+        db->_refcnt--;
+        return 1;
+    }
+    
+    if (db->path && stat(db->path, &st) == 0 && S_ISREG(st.st_mode))
+        unlink(db->path);
+    
+    tndb_free(db);
+    return 1;
+}
