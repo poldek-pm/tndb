@@ -341,13 +341,10 @@ struct tndb *tndb_new(unsigned flags)
 {
     struct tndb *db;
     int i;
-
     
-    db = n_malloc(sizeof(*db));
-    db->rflags = 0;
+    db = n_calloc(1, sizeof(*db));
     db->st = NULL;
     db->path = NULL;
-    db->current_doffs = 0;
 
     tndb_hdr_init(&db->hdr, flags);
     
