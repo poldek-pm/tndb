@@ -35,7 +35,7 @@ int  tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags);
 struct tndb_hdr {
     unsigned char      hdr[8];
     uint8_t            flags; 
-    struct tndb_sign   sign;   
+    struct tndb_sign   sign;        /* signatures, variable length  */
     uint32_t           ts;          /*  */
     uint32_t           nrec;        /* number of records */
     uint32_t           doffs;       /* offset of first data record */
@@ -44,7 +44,7 @@ struct tndb_hdr {
 void tndb_hdr_init(struct tndb_hdr *hdr, unsigned flags);
 int tndb_hdr_store(struct tndb_hdr *hdr, tn_stream *st);
 int tndb_hdr_compute_digest(struct tndb_hdr *hdr);
-int tndb_hdr_store_size(struct tndb_hdr *hdr);
+int tndb_hdr_store_sizeof(struct tndb_hdr *hdr);
 int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st);
 
 #define tndb_hdr_upsign(hdr, buf, size)                \
@@ -77,13 +77,17 @@ int tndb_hent_cmp_store(const struct tndb_hent *h1, struct tndb_hent *h2);
 
 #define TNDB_R_UNLINKED    (1 << 10)
 struct tndb {
-    unsigned                 rflags; /* runtime flags */
+    unsigned                 rtflags; /* runtime flags */
     char                     *path;
     tn_stream                *st;
     struct tndb_hdr          hdr;
 
-    uint32_t                 current_doffs; /* used in rw mode only */
-    
+    union {
+        uint32_t                 htt;     /* offset of hash table; computed
+                                            basing on hdr end position  */
+        uint32_t                 current; /* used in rw mode only */
+    } offs;
+
     tn_array                 *htt[TNDB_HTSIZE];  /* arary of tn_array ptr of
                                                     tndb_hent */
     char                     errmsg[128];

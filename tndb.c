@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include <openssl/evp.h>
 
@@ -130,39 +131,154 @@ void tndb_sign_final(struct tndb_sign *sign)
     
 }
 
-int tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags) 
-{
-    n_assert(n_stream_tell(st) == TNDBSIGN_OFFSET);
 
-    //printf("md_store = %s\n", tndb_bin2hex_s(sign->md, sizeof(sign->md)));
+/* every sig is stored as: [name size(1byte)]name[sig size(2bytes)]sig */
+static
+int tndb_sign_store_sizeof(struct tndb_sign *sign, uint32_t flags) 
+{
+    int size = sizeof(uint16_t); /* tndb_sign size */
     
-    if (flags & TNDB_SIGN_DIGEST) 
-        return n_stream_write(st, sign->md, sizeof(sign->md)) ==
-            sizeof(sign->md);
-    
-    return 1;
+    if (flags & TNDB_SIGN_DIGEST)
+        size += sizeof(uint8_t) + strlen("md") +
+            sizeof(uint16_t) + sizeof(sign->md);
+#define DUMMY_TEST_SIGN 0
+#if DUMMY_TEST_SIGN
+    size += sizeof(uint8_t) + strlen("dupa") +
+            sizeof(uint16_t) + (2 * sizeof(sign->md));
+#endif    
+    return size;
 }
 
-static
-int tndb_sign_store_size(struct tndb_sign *sign, uint32_t flags) 
+
+static 
+int store_sig(tn_stream *st, const char *name, void *sig, int size)
 {
-    if (flags & TNDB_SIGN_DIGEST)
-        return sizeof(sign->md);
+    uint16_t ssize;
+    uint8_t  nsize;
+    int stsize = 0, len;
+
+    len = strlen(name); 
+    n_assert(len < UINT8_MAX);
+    nsize = len;
+    if (!n_stream_write_uint8(st, nsize))
+        return 0;
     
-    return 0;
+    if (n_stream_write(st, name, len) != len)
+        return 0;
+
+    stsize += sizeof(nsize) + len;
+
+    n_assert(size < UINT16_MAX);
+    ssize = size;
+    if (!n_stream_write_uint16(st, ssize))
+        return 0;
+
+    if (n_stream_write(st, sig, size) != size)
+        return 0;
+    
+    stsize += sizeof(ssize) + size;
+
+    return stsize;
+}
+
+static 
+int restore_sig(tn_stream *st, char *name, int namesize, void *sig, size_t size)
+{
+    uint16_t ssize;
+    uint8_t  nsize;
+    int stsize = 0;
+
+    if (!n_stream_read_uint8(st, &nsize))
+        return 0;
+    
+    n_assert(namesize > nsize);
+    if (n_stream_read(st, name, nsize) != nsize)
+        return 0;
+    name[nsize] = '\0';
+    
+    stsize += sizeof(nsize) + nsize;
+
+    if (!n_stream_read_uint16(st, &ssize))
+        return 0;
+    
+    n_assert(size > ssize);
+    if (n_stream_read(st, sig, ssize) != ssize)
+        return 0;
+    
+    stsize += sizeof(ssize) + ssize;
+    return stsize;
+}
+
+
+int tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags) 
+{
+    int size, stsize;
+    
+    n_assert(n_stream_tell(st) == TNDBSIGN_OFFSET);
+
+    size = tndb_sign_store_sizeof(sign, flags); 
+    n_assert(size < UINT16_MAX);
+    
+    if (!n_stream_write_uint16(st, size))
+        return 0;
+
+    stsize = 0;
+    if (flags & TNDB_SIGN_DIGEST) {
+        int n;
+        if ((n = store_sig(st, "md", sign->md, sizeof(sign->md))) == 0)
+            return 0;
+        stsize += n;
+    }
+#if DUMMY_TEST_SIGN
+    {
+        char buf[1024] = "ala ma kota xxxxxxxxxxxxxxxxxxxt";
+        int n;
+        
+        if ((n = store_sig(st, "dupa", buf, 2 * sizeof(sign->md))) == 0)
+            return 0;
+        stsize += n;
+    }
+#endif    
+    n_assert((int)sizeof(uint16_t) + stsize == size);
+    return 1;
 }
 
 
 int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
 {
-    int rc = 1;
-
+    int rc = 1, size;
+    uint16_t size16;
+    char name[32], sig[UINT16_MAX];
+    
     n_assert(n_stream_tell(st) == TNDBSIGN_OFFSET);
-    if (flags & TNDB_SIGN_DIGEST)
-        rc = (n_stream_read(st, sign->md, sizeof(sign->md)) ==
-              sizeof(sign->md));
+    if (!n_stream_read_uint16(st, &size16))
+        return 0;
 
-    //printf("md_restore = %s\n", tndb_bin2hex_s(sign->md, sizeof(sign->md)));
+    size16 -= sizeof(size16);
+    size = size16;
+
+    while (size > 0) {
+        int n;
+        n = restore_sig(st, name, sizeof(name), sig, sizeof(sig));
+        if (n == 0) {
+            rc = 0;
+            break;
+        }
+        size -= n;
+        if (size < 0 || size > size16) {  /* overrun */
+            rc = 0;
+            errno = EINVAL;
+            break;
+        }
+        DBGF("%s, length=%d\n", name, n);
+        if (strcmp(name, "md") == 0) {
+            n_assert (flags & TNDB_SIGN_DIGEST);
+            if (!memcpy(sign->md, sig, sizeof(sign->md))) {
+                rc = 0;
+                break;
+            }
+        }
+    }
     return rc;
 }
 
@@ -238,12 +354,12 @@ int tndb_hdr_compute_digest(struct tndb_hdr *hdr)
 }
 
 
-int tndb_hdr_store_size(struct tndb_hdr *hdr)
+int tndb_hdr_store_sizeof(struct tndb_hdr *hdr)
 {
     int size = 0;
     
     size += sizeof(hdr->hdr) + sizeof(hdr->flags);
-    size += tndb_sign_store_size(&hdr->sign, hdr->flags);
+    size += tndb_sign_store_sizeof(&hdr->sign, hdr->flags);
     size += sizeof(hdr->nrec) + sizeof(hdr->doffs) +
         sizeof(hdr->ts);
     return size;

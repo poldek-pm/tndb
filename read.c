@@ -36,14 +36,14 @@
 
 inline int verify_db(struct tndb *db)
 {
-    if (db->rflags & TNDB_R_SIGN_VRFIED)
+    if (db->rtflags & TNDB_R_SIGN_VRFIED)
         return 1;
     
     if (db->hdr.flags & TNDB_SIGNED)
         return tndb_verify(db);
 
     n_assert(0);
-    db->rflags |= TNDB_R_SIGN_VRFIED;
+    db->rtflags |= TNDB_R_SIGN_VRFIED;
     return 1;
 }
 
@@ -187,9 +187,7 @@ int read_eq(const struct tndb *db, const uint32_t offs,
 
 static int htt_read(struct tndb *db)
 {
-    int i, j, hdr_stsize;
-
-    hdr_stsize = tndb_hdr_store_size(&db->hdr);
+    int i, j;
     
     for (i=0; i < TNDB_HTSIZE; i++)
         db->htt[i] = NULL;
@@ -201,7 +199,7 @@ static int htt_read(struct tndb *db)
 
         db->htt[i] = NULL;
 
-        offs = hdr_stsize + (sizeof(uint32_t) * i); 
+        offs = db->offs.htt + (sizeof(uint32_t) * i); 
         
         if (!nn_stream_read_uint32_offs(db->st, &ht_offs, offs))
             return 0;
@@ -249,7 +247,7 @@ static int htt_read(struct tndb *db)
 }
 
 static
-int verify_digest(struct tndb_hdr *hdr, tn_stream *st)
+int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st)
 {
     unsigned char buf[4096];
     struct tndb_sign sign;
@@ -268,14 +266,11 @@ int verify_digest(struct tndb_hdr *hdr, tn_stream *st)
 
     tndb_hdr_compute_digest(hdr);
     
-    if ((hdr->flags & TNDB_NOHASH) == 0) {
+    if ((hdr->flags & TNDB_NOHASH) == 0) { /* process hash table if any */
         int to_read;
-        uint32_t htt_offs;
-        
-        
-        htt_offs = tndb_hdr_store_size(hdr);
-        n_stream_seek(st, htt_offs, SEEK_SET);
-        to_read = hdr->doffs - htt_offs;
+
+        n_stream_seek(st, htt_offset, SEEK_SET);
+        to_read = hdr->doffs - htt_offset;
         
         while (to_read > 0) {
             int n = sizeof(buf);
@@ -329,30 +324,32 @@ struct tndb *do_tndb_open(int fd, const char *path)
         n_stream_close(st);
         return NULL;
     }
-
+    
     if (hdr.nrec <= 0) {
         n_stream_close(st);
         return NULL;
     }
     
     db = tndb_new(0);
+    db->offs.htt = n_stream_tell(st); /* just after the hdr */
     db->path = n_strdupl(path, n);
     db->st = st;
-    db->rflags = TNDB_R_MODE_R;
+    db->rtflags = TNDB_R_MODE_R;
     db->hdr = hdr;
     
     DBGF("nrec %u, doffs %u\n", hdr.nrec, hdr.doffs);
     
-#if 0
-    if ((hdr.flags & TNDB_NOHASH) == 0 && (db->rflags & TNDB_R_HTT_LOADED) == 0) {
+#if 0                           /* do lazy loading */
+    if ((hdr.flags & TNDB_NOHASH) == 0 &&
+        (db->rtflags & TNDB_R_HTT_LOADED) == 0) {
         if (!htt_read(db))
             n_die("htt_read failed\n");
-        db->rflags |= TNDB_R_HTT_LOADED;
+        db->rtflags |= TNDB_R_HTT_LOADED;
     }
 #endif
 
     if ((db->hdr.flags & TNDB_SIGNED) == 0)
-        db->rflags |= TNDB_R_SIGN_VRFIED;
+        db->rtflags |= TNDB_R_SIGN_VRFIED;
     
     return db;
 }
@@ -375,12 +372,12 @@ int tndb_verify(struct tndb *db)
 {
     int rc = 0;
 
-    db->rflags |= TNDB_R_SIGN_VRFIED;
+    db->rtflags |= TNDB_R_SIGN_VRFIED;
     
     if (verify_md5(db->path))
         rc = 1;
     
-    else if (verify_digest(&db->hdr, db->st)) {
+    else if (verify_digest(&db->hdr, db->offs.htt, db->st)) {
         make_md5(db->path);
         rc = 1;
     }
@@ -413,14 +410,14 @@ int tndb_get_voff(struct tndb *db, const void *key,
         return 0;
 
     if (db->hdr.flags & TNDB_NOHASH) 
-        n_die("tndb: method not allowed on hash-disabled file\n");  
+        n_die("tndb: method not allowed on file without hash table\n");  
 
     
-    if ((db->rflags & TNDB_R_HTT_LOADED) == 0) {
+    if ((db->rtflags & TNDB_R_HTT_LOADED) == 0) {
         if (!htt_read(db))
             n_die("tndb: %p, htt_read failed\n", db);
         //printf("tndb: %p, htt_read OK\n", db);
-        db->rflags |= TNDB_R_HTT_LOADED;
+        db->rtflags |= TNDB_R_HTT_LOADED;
     }
 
     *voffs = (off_t) -1;
@@ -537,7 +534,7 @@ tn_array *tndb_keys(struct tndb *db)
 
 int tndb_it_start(struct tndb *db, struct tndb_it *it)
 {
-    n_assert(db->rflags & TNDB_R_MODE_R);
+    n_assert(db->rtflags & TNDB_R_MODE_R);
 
     if (!verify_db(db))
         return 0;

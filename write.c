@@ -74,7 +74,7 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
         return NULL;
     
     db = tndb_new(flags);
-    db->rflags |= TNDB_R_MODE_W;
+    db->rtflags |= TNDB_R_MODE_W;
     db->st = st;
     db->path = n_strdupl(path, n);
     
@@ -91,7 +91,7 @@ static inline int put_key(struct tndb *db, const char *key, size_t klen_)
     struct tndb_hent       *he;
     uint8_t                klen;
 
-    n_assert(db->rflags & TNDB_R_MODE_W);
+    n_assert(db->rtflags & TNDB_R_MODE_W);
 
     if (klen_ > UINT8_MAX)
         n_die("Key is too long (max is %d)\n", UINT8_MAX);
@@ -107,7 +107,7 @@ static inline int put_key(struct tndb *db, const char *key, size_t klen_)
             db->htt[hv_i] = ht;
         }
     
-        he = tndb_hent_new(db, hv, db->current_doffs);
+        he = tndb_hent_new(db, hv, db->offs.current);
         if (hv_i == 50)
             DBGF("addh[%d][%d] %s %u %u\n", hv_i, n_array_size(ht),
                  key, he->val, he->offs);
@@ -115,7 +115,7 @@ static inline int put_key(struct tndb *db, const char *key, size_t klen_)
     }
     
     n_assert(sizeof(klen) == 1);
-    db->current_doffs += sizeof(klen) + klen;
+    db->offs.current += sizeof(klen) + klen;
 
     if (n_stream_write(db->st, &klen, 1) != 1)
         return 0;
@@ -140,7 +140,7 @@ int tndb_put(struct tndb *db, const char *key, size_t klen_,
     if (n_stream_write(db->st, val, vlen) != (int)vlen)
         return 0;
 
-    db->current_doffs += sizeof(vlen) + vlen;
+    db->offs.current += sizeof(vlen) + vlen;
     db->hdr.nrec++;
     return 1;
 }
@@ -181,9 +181,9 @@ static int htt_write(struct tndb *db)
     n_assert((db->hdr.flags & TNDB_NOHASH) == 0);
 
     htt_size = htt_store_size(db);
-    data_offs = tndb_hdr_store_size(&db->hdr) + htt_size;
+    data_offs = tndb_hdr_store_sizeof(&db->hdr) + htt_size;
     
-    ht_offs = tndb_hdr_store_size(&db->hdr) + TNDB_HTBYTESIZE;
+    ht_offs = tndb_hdr_store_sizeof(&db->hdr) + TNDB_HTBYTESIZE;
     //printf("data_offset %x\n", data_offs);
     DBGF("start at %ld, data_offs %d, ht_offs %d\n",
          n_stream_tell(db->st), data_offs, ht_offs);
@@ -264,7 +264,7 @@ static int tndbw_close(struct tndb *db)
     int    fdin = -1, fdout = -1, type, rc;
 
     rc = 0;
-    n_assert(db->rflags & TNDB_R_MODE_W);
+    n_assert(db->rtflags & TNDB_R_MODE_W);
     
     n_stream_flush(db->st);
     type = db->st->type;
@@ -281,7 +281,7 @@ static int tndbw_close(struct tndb *db)
     if ((db->st = n_stream_dopen(fdout, "wb", type)) == NULL)
         goto l_end;
     
-    db->hdr.doffs = tndb_hdr_store_size(&db->hdr) + htt_store_size(db);
+    db->hdr.doffs = tndb_hdr_store_sizeof(&db->hdr) + htt_store_size(db);
     //printf("headers = %d\n", db->hdr.doffs);
 
     if (db->hdr.flags & TNDB_SIGN_DIGEST) {
@@ -347,8 +347,8 @@ int tndb_close(struct tndb *db)
     }
 
     /* do not save created file if unlinked */
-    if (db->rflags & TNDB_R_MODE_W) {
-        if ((db->rflags & TNDB_R_UNLINKED) == 0)
+    if (db->rtflags & TNDB_R_MODE_W) {
+        if ((db->rtflags & TNDB_R_UNLINKED) == 0)
             return tndbw_close(db);
         
         else if (db->hdr.flags & TNDB_SIGN_DIGEST)
@@ -362,8 +362,8 @@ int tndb_close(struct tndb *db)
 
 int tndb_unlink(struct tndb *db)
 {
-    db->rflags |= TNDB_R_UNLINKED;
-    if ((db->rflags & TNDB_R_MODE_R) && db->path)
+    db->rtflags |= TNDB_R_UNLINKED;
+    if ((db->rtflags & TNDB_R_MODE_R) && db->path)
         unlink(db->path);
 
     return 1;
