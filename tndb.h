@@ -35,7 +35,7 @@ struct tndb;
 #define TNDB_SIGNED       TNDB_SIGN_DIGEST /* build signed db */
 
 /* creates new database */
-struct tndb *tndb_creat(const char *name, unsigned flags);
+struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags);
 
 int tndb_put(struct tndb *db, const char *key, size_t klen,
              const void *val, size_t vlen);
