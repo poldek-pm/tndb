@@ -648,8 +648,8 @@ int tndb_it_get_end(struct tndb_it *it)
     off = n_stream_tell(it->_db->st);
 
     if (off > (int)it->_off) {
-        n_die("tndb_it_get_end: current offset is %lu, expected %lu\n",
-              off, it->_off);
+        printf("tndb_it_get_end: current offset is %lu, expected %u\n", off,
+               it->_off);
         return 0;
     }
     
