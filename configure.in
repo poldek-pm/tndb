@@ -9,7 +9,7 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_RANLIB
 AM_CONFIG_HEADER(config.h)
-AC_DISABLE_SHARED
+#AC_DISABLE_SHARED
 AM_PROG_LIBTOOL
 
 AM_CFLAGS="-Wall -W"
@@ -32,6 +32,8 @@ AC_CHECK_FUNCS(EVP_DigestInit,,
 	 [AC_MSG_ERROR(["libcryto is needed by $PACKAGE"])]
 	)],)
 
+AC_CHECK_LIB(z, gzopen)
+
 
 dnl use local ../trurlib copy if it exists
 CONF_IN_LDFLAGS=
@@ -40,14 +42,14 @@ if test -f "../trurlib/include/trurl/trurl.h"; then
 	AC_MSG_RESULT([yes])
 	TRURL_INCLUDE="-I\$(top_srcdir)/../trurlib/include/"
 	TRURL_LDFLAG="-L\$(top_srcdir)/../trurlib"
+	TRURL_LDFLAG=""
 	AC_SUBST(TRURL_INCLUDE)
 	AC_SUBST(TRURL_LDFLAG)
-	LDFLAGS="$LDFLAGS -L../trurlib"
+	#LDFLAGS="$LDFLAGS -L../trurlib"
+	LIBS="$LIBS ../trurlib/libtrurl.la"
 else 
 	AC_CHECK_HEADER(trurl/trurl.h,,AC_MSG_ERROR("trurl.h is missing"))
+	AC_CHECK_LIB(trurl, n_cfree)
 fi
-
-dnl Checks for libraries.
-AC_CHECK_LIB(z, gzopen)
 
 AC_OUTPUT([ Makefile ])
