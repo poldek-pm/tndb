@@ -94,7 +94,7 @@ void tndb_sign_init(struct tndb_sign *sign)
     EVP_DigestInit(&ctx, EVP_sha1());
     sign->ctx = n_malloc(sizeof(ctx));
     memcpy(sign->ctx, &ctx, sizeof(ctx));
-    //printf(" >> INIT\n");
+    //printf("%p %p >> INIT\n", sign, sign->ctx);
 }
 
 void tndb_sign_update(struct tndb_sign *sign, const void *buf, size_t size) 
@@ -117,7 +117,7 @@ void tndb_sign_final(struct tndb_sign *sign)
     unsigned char buf[1024];
     int n;
 
-    //printf(" >> FINAL\n");
+    //printf("%p %p >> FINAL\n", sign, sign->ctx);
     EVP_DigestFinal(sign->ctx, buf, &n);
     
     if (n > (int)sizeof(sign->md)) 

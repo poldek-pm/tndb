@@ -341,13 +341,18 @@ static int tndbw_close(struct tndb *db)
 
 int tndb_close(struct tndb *db)
 {
-    /* do not save created file if unlinked */
-    if ((db->rflags & TNDB_R_MODE_W) && (db->rflags & TNDB_R_UNLINKED) == 0)
-        return tndbw_close(db);
-    
     if (db->_refcnt > 0) {
         db->_refcnt--;
         return 1;
+    }
+
+    /* do not save created file if unlinked */
+    if (db->rflags & TNDB_R_MODE_W) {
+        if ((db->rflags & TNDB_R_UNLINKED) == 0)
+            return tndbw_close(db);
+        
+        else if (db->hdr.flags & TNDB_SIGN_DIGEST)
+            tndb_sign_final(&db->hdr.sign);
     }
 
     tndb_free(db);
@@ -357,13 +362,6 @@ int tndb_close(struct tndb *db)
 
 int tndb_unlink(struct tndb *db)
 {
-    struct stat st;
-    
-    if (db->_refcnt > 0) {
-        db->_refcnt--;
-        return 1;
-    }
-
     db->rflags |= TNDB_R_UNLINKED;
     if ((db->rflags & TNDB_R_MODE_R) && db->path)
         unlink(db->path);
