@@ -155,7 +155,7 @@ int tndb_sign_store_size(struct tndb_sign *sign, uint32_t flags)
 
 int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
 {
-    int rc = 0;
+    int rc = 1;
 
     n_assert(n_stream_tell(st) == TNDBSIGN_OFFSET);
     if (flags & TNDB_SIGN_DIGEST)

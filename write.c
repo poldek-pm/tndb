@@ -24,6 +24,7 @@
 #include <trurl/narray.h>
 #include <trurl/nassert.h>
 
+#define ENABLE_TRACE 0
 #include "tndb_int.h"
 #include "tndb.h"
 
@@ -181,6 +182,8 @@ static int htt_write(struct tndb *db)
     
     ht_offs = tndb_hdr_store_size(&db->hdr) + TNDB_HTBYTESIZE;
     //printf("data_offset %x\n", data_offs);
+    DBGF("start at %ld, data_offs %d, ht_offs %d\n",
+         n_stream_tell(db->st), data_offs, ht_offs);
     
     for (i=0; i < TNDB_HTSIZE; i++) {
         tn_array *ht = db->htt[i];
@@ -195,17 +198,15 @@ static int htt_write(struct tndb *db)
             n_assert(n_array_size(ht) > 0);
             if (!n_stream_write_uint32(db->st, ht_offs))
                 return 0;
-
+            
+            DBGF("w[%d] %d\n", i, ht_offs);
             ht_offs += sizeof(uint32_t); /* table size */
             ht_offs += n_array_size(ht) * (2 * sizeof(uint32_t));
-            
-            if (i == 50)
-                DBGF("hash0[%d] = %d\n", i, ht_offs);
         }
     }
 
     n_assert(ht_offs == data_offs);
-    DBGF("data_offset = %u\n", data_offs);
+    //DBGF("data_offset = %u\n", data_offs);
     
 
     for (i=0; i < TNDB_HTSIZE; i++) {
@@ -223,11 +224,16 @@ static int htt_write(struct tndb *db)
             for (j = 0; j < n_array_size(ht); j++) {
                 struct tndb_hent *he = n_array_nth(ht, j);
                 
+                
+                //if (i == 50)
+                DBGF("at %ld h0[%d].h1[%d](%u) (%d+) %d\n",
+                     n_stream_tell(db->st), 
+                     i, j,
+                     he->val, data_offs, he->offs);
+
                 if (!n_stream_write_uint32(db->st, he->val))
                     return 0;
-                //if (i == 50)
-                DBGF("write h0[%d].h1[%d](%u) (%d+) %d\n", i, j,
-                     h->val, data_offs, h->offs);
+                
                 if (!n_stream_write_uint32(db->st, he->offs + data_offs))
                     return 0;
             }
@@ -284,10 +290,8 @@ static int tndbw_close(struct tndb *db)
     
         
         n_stream_set_write_hook(db->st, NULL, NULL);
-        
+        tndb_sign_final(&db->hdr.sign);
     }
-
-    tndb_sign_final(&db->hdr.sign);
     
     if (!tndb_hdr_store(&db->hdr, db->st))
         goto l_end;

@@ -45,7 +45,7 @@ int test_creat(const char *name, int items)
     printf("\n\nCreating %s with %d records...", name, items);
     fflush(stdout);
     
-    if ((db = tndb_creat(name, 0)) == NULL) {
+    if ((db = tndb_creat(name, TNDB_SIGN_DIGEST)) == NULL) {
         perror("tndb_creat");
         return -1;
     }
@@ -86,7 +86,7 @@ int test_creat_bigdata(const char *name, int items)
     printf("\n\nCreating %s with %d records...", name, items);
     fflush(stdout);
     
-    if ((db = tndb_creat(name, TNDB_SIGN_DIGEST | TNDB_NOHASH)) == NULL) {
+    if ((db = tndb_creat(name, TNDB_SIGN_DIGEST)) == NULL) {
         perror("tndb_creat");
         return -1;
     }
@@ -340,30 +340,31 @@ int main(void)
     exit(0);
 #endif
 
-#if 1
-    n = 20000;
+#if 0
+    n = 200;
     tt = timethis_begin();
     test_creat_bigdata(NAMEZ, n);
     timethis_end(tt, "creat");
 #endif    
-#if 1    
+#if 0    
     tt = timethis_begin();
     test_walk(NAMEZ, n, 0);
     timethis_end(tt, "walk");
     exit(0);
 #endif    
 
-    for (i=0; i<4 ; i++) {
+    n = 200;
+    for (i=0; i<1 ; i++) {
         n += (n * i);
         if (i < 1) {             /* too much space */
             tt = timethis_begin();
-            test_creat(NAME, n);
+            test_creat(NAMEZ, n);
             timethis_end(tt, "creat");
 
             tt = timethis_begin();
-            test_lookup(NAME, n);
+            test_lookup(NAMEZ, n);
             timethis_end(tt, "lookup");
-
+            exit(0);
             tt = timethis_begin();
             test_walk(NAME, n, 1);
             timethis_end(tt, "walk");
@@ -372,7 +373,7 @@ int main(void)
             test_walk(NAME, n, 0);
             timethis_end(tt, "walk(no keys)");
         }
-
+        exit(0);
         tt = timethis_begin();
         test_creat(NAMEZ, n);
         timethis_end(tt, "creat");

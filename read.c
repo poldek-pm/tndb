@@ -28,15 +28,23 @@
 #include <trurl/n_snprintf.h>
 
 #include "tndb.h"
+#define ENABLE_TRACE 0
 #include "tndb_int.h"
 
-static char *msg_not_verified = "tndb: %s: refusing read unchecked file\n";
+//static char *msg_not_verified = "tndb: %s: refusing read unchecked file\n";
 
-#define CHECK_VERFIED(db) \
-  do {  \
-    if ((db->hdr.flags & TNDB_SIGNED) && (db->rflags & TNDB_R_SIGN_VRFIED) == 0) \
-         n_die(msg_not_verified, db->path); \
-  } while (0);
+inline int verify_db(struct tndb *db)
+{
+    if (db->rflags & TNDB_R_SIGN_VRFIED)
+        return 1;
+    
+    if (db->hdr.flags & TNDB_SIGNED)
+        return tndb_verify(db);
+
+    n_assert(0);
+    db->rflags |= TNDB_R_SIGN_VRFIED;
+    return 1;
+}
 
 
 static
@@ -136,7 +144,7 @@ int verify_md5(const char *pathname)
     snprintf(path, sizeof(path), "%s.md5", pathname);
     if ((fd = open(path, O_RDONLY)) < 0)
         return 0;
-    
+     
     md2_size = read(fd, md2, sizeof(md2));
     close(fd);
 
@@ -169,7 +177,8 @@ int read_eq(const struct tndb *db, const uint32_t offs,
         return -1;
     
     buf[len] = '\0';
-    DBGF("memcmp[%d] %s <> %s\n", offs, buf, str);
+    DBGF("memcmp[%d] %s == %s ? %d\n", offs, buf, str,
+         memcmp(buf, str, len));
     
     return memcmp(buf, str, len) == 0;
 }
@@ -197,9 +206,11 @@ static int htt_read(struct tndb *db)
             return 0;
         
         if (ht_offs == 0) {
-            DBGF("empty %d\n", i);
+            //DBGF("empty %d\n", i);
             continue;
         }
+
+        DBGF("r[%d] %d\n", i, ht_offs);
         
         if (!nn_stream_read_uint32_offs(db->st, &ht_size, ht_offs))
             return 0;
@@ -209,8 +220,6 @@ static int htt_read(struct tndb *db)
             n_assert(0);
             continue;
         }
-
-        DBGF("size[%d] %d\n", i, ht_size);
         
         if (ht == NULL) {
             ht = n_array_new(ht_size, tndb_hent_free, (tn_fn_cmp)tndb_hent_cmp);
@@ -227,6 +236,9 @@ static int htt_read(struct tndb *db)
             if (!n_stream_read_uint32(db->st, &offs))
                 return 0;
             
+            DBGF("at %ld h0[%d].h1[%d](%d) %d\n",
+                 n_stream_tell(db->st) - (2 * sizeof(uint32_t)), 
+                 i, j, val, offs);
             he = tndb_hent_new(db, val, offs);
             n_array_push(ht, he);
         }
@@ -257,9 +269,12 @@ int verify_digest(struct tndb_hdr *hdr, tn_stream *st)
     
     if ((hdr->flags & TNDB_NOHASH) == 0) {
         int to_read;
+        uint32_t htt_offs;
         
-        n_stream_seek(st, off, SEEK_SET);
-        to_read = hdr->doffs - off;
+        
+        htt_offs = tndb_hdr_store_size(hdr);
+        n_stream_seek(st, htt_offs, SEEK_SET);
+        to_read = hdr->doffs - htt_offs;
         
         while (to_read > 0) {
             int n = sizeof(buf);
@@ -277,7 +292,9 @@ int verify_digest(struct tndb_hdr *hdr, tn_stream *st)
     tndb_sign_final(&hdr->sign);
     n = 0;
 
-    DBGF("md_compute = %s, %d\n", (char*)tndb_bin2hex_s(hdr->sign.md, sizeof(sign.md)),
+    DBGF("md_compute =\n %s\n %s\n %d\n",
+         (char*)tndb_bin2hex_s(hdr->sign.md, sizeof(sign.md)),
+         (char*)tndb_bin2hex_s(sign.md, sizeof(sign.md)),
          memcmp(sign.md, hdr->sign.md, sizeof(sign.md)));
     
     if (memcmp(sign.md, hdr->sign.md, sizeof(sign.md)) == 0)
@@ -325,13 +342,16 @@ struct tndb *do_tndb_open(int fd, const char *path)
     
     DBGF("nrec %u, doffs %u\n", hdr.nrec, hdr.doffs);
     
-#if 0    
-    if ((db->rflags & TNDB_R_HTT_LOADED) == 0) {
+#if 0
+    if ((hdr.flags & TNDB_NOHASH) == 0 && (db->rflags & TNDB_R_HTT_LOADED) == 0) {
         if (!htt_read(db))
             n_die("htt_read failed\n");
         db->rflags |= TNDB_R_HTT_LOADED;
     }
 #endif
+
+    if ((db->hdr.flags & TNDB_SIGNED) == 0)
+        db->rflags |= TNDB_R_SIGN_VRFIED;
     
     return db;
 }
@@ -345,6 +365,7 @@ struct tndb *tndb_open(const char *path)
 
 struct tndb *tndb_dopen(int fd, const char *path) 
 {
+    
     return do_tndb_open(fd, path);
 }
 
@@ -362,7 +383,7 @@ int tndb_verify(struct tndb *db)
         make_md5(db->path);
         rc = 1;
     }
-    
+    DBGF("tndb_verify %s %d\n", db->path, rc);
     return rc;
 }
 
@@ -387,16 +408,17 @@ int tndb_get_voff(struct tndb *db, const void *key,
     int                      n, found = 0;
 
 
-    CHECK_VERFIED(db);
+    if (!verify_db(db))
+        return 0;
 
     if (db->hdr.flags & TNDB_NOHASH) 
-        n_die("tndb: method not allowed on no hash-enable file\n");  
+        n_die("tndb: method not allowed on hash-disabled file\n");  
 
     
-
     if ((db->rflags & TNDB_R_HTT_LOADED) == 0) {
         if (!htt_read(db))
-            n_die("tndb: htt_read failed\n");
+            n_die("tndb: %p, htt_read failed\n", db);
+        //printf("tndb: %p, htt_read OK\n", db);
         db->rflags |= TNDB_R_HTT_LOADED;
     }
 
@@ -492,7 +514,8 @@ tn_array *tndb_keys(struct tndb *db)
     tn_array        *keys;
     off_t           voffs;
 
-    CHECK_VERFIED(db);
+    if (!verify_db(db))
+        return NULL;
     
     if (!tndb_it_start(db, &it))
         return NULL;
@@ -515,7 +538,8 @@ int tndb_it_start(struct tndb *db, struct tndb_it *it)
 {
     n_assert(db->rflags & TNDB_R_MODE_R);
 
-    CHECK_VERFIED(db);
+    if (!verify_db(db))
+        return 0;
 
     it->_db = db;
     it->st = db->st;
@@ -569,7 +593,7 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, size_t *klen,
     if (!nn_stream_read_uint32_offs(st, vlen, it->_off))
         return 0;
 
-    DBGF("val[%d] (%d)\n", it->_offs, *vlen);
+    //DBGF("val[%d] (%d)\n", it->_offs, *vlen);
     it->_off += *vlen + sizeof(uint32_t);
     it->_nrec++;
     
