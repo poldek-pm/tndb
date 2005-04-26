@@ -98,7 +98,7 @@ void tndb_sign_init(struct tndb_sign *sign)
     //printf("%p %p >> INIT\n", sign, sign->ctx);
 }
 
-void tndb_sign_update(struct tndb_sign *sign, const void *buf, size_t size) 
+void tndb_sign_update(struct tndb_sign *sign, const void *buf, unsigned int size) 
 {
     n_assert(sign->ctx);
     EVP_DigestUpdate(sign->ctx, buf, size);
@@ -182,7 +182,7 @@ int store_sig(tn_stream *st, const char *name, void *sig, int size)
 }
 
 static 
-int restore_sig(tn_stream *st, char *name, int namesize, void *sig, size_t size)
+int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int size)
 {
     uint16_t ssize;
     uint8_t  nsize;

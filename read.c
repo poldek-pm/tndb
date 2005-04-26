@@ -195,7 +195,7 @@ static int htt_read(struct tndb *db)
     for (i=0; i < TNDB_HTSIZE; i++) {
         tn_array *ht = db->htt[i];
         uint32_t ht_offs, ht_size, offs;
-
+        
 
         db->htt[i] = NULL;
 
@@ -396,8 +396,8 @@ tn_stream *tndb_tn_stream(const struct tndb *db)
     return db->st;
 }
 
-int tndb_get_voff(struct tndb *db, const void *key,
-                  size_t klen_, off_t *voffs, size_t *vlen)
+int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
+                  off_t *voffs, unsigned int *vlen)
 {
     uint32_t                 hv, hv_i;
     tn_array                 *ht;
@@ -423,9 +423,10 @@ int tndb_get_voff(struct tndb *db, const void *key,
     *voffs = (off_t) -1;
     *vlen = 0;
 
-    if (klen_ > UINT8_MAX)
+    if (aklen > UINT8_MAX)
         n_die("tndb: key too long (max is %d)\n", UINT8_MAX);
-    klen = klen_;
+
+    klen = aklen;
     
     hv = tndb_hash(key, klen);
     hv_i = hv & 0xff;
@@ -462,10 +463,13 @@ int tndb_get_voff(struct tndb *db, const void *key,
         }
         
         if (read_eq(db, he->offs + sizeof(klen), key, klen)) {
+            uint32_t len;
             found = 1;
             
             *voffs = he->offs + sizeof(uint8_t) + klen;
-            if (!nn_stream_read_uint32_offs(db->st, vlen, *voffs))
+            if (nn_stream_read_uint32_offs(db->st, &len, *voffs))
+                *vlen = len;
+            else 
                 found = -1;
             *voffs += sizeof(uint32_t);
         }
@@ -474,15 +478,14 @@ int tndb_get_voff(struct tndb *db, const void *key,
     return found;                     
 }
 
-
-int tndb_get(struct tndb *db, const void *key,
-             size_t klen, void *val, size_t size)
+int tndb_get(struct tndb *db, const void *key, unsigned int klen,
+             void *val, unsigned int valsize)
 {
-    off_t voffs;
-    size_t vlen;
-    int nread = 0;
+    off_t        voffs;
+    unsigned int vlen;
+    int          nread = 0;
 
-    if (tndb_get_voff(db, key, klen, &voffs, &vlen) && vlen < size) {
+    if (tndb_get_voff(db, key, klen, &voffs, &vlen) && vlen < valsize) {
         nread = nn_stream_read_offs(db->st, val, vlen, voffs);
         if (nread != (int)vlen)
             nread = 0;
@@ -491,13 +494,12 @@ int tndb_get(struct tndb *db, const void *key,
     return nread;
 }
 
-
 int tndb_get_str(struct tndb *db, const char *key,
-                 unsigned char *val, size_t size)
+                 unsigned char *val, unsigned int valsize)
 {
     int nread = 0;
     
-    if ((nread = tndb_get(db, key, strlen(key), val, size - 1)))
+    if ((nread = tndb_get(db, key, strlen(key), val, valsize - 1)))
         val[nread] = '\0';
     
     return nread;
@@ -554,10 +556,11 @@ int tndb_it_start(struct tndb *db, struct tndb_it *it)
   key size must be at least 256 + 1 bytes (maximum tndb key length)
   if key is NULL then keys are not retrieved 
  */
-int tndb_it_get_voff(struct tndb_it *it, void *key, size_t *klen,
-                     off_t *voff, size_t *vlen)
+int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
+                     off_t *voff, unsigned int *vlen)
 {
     uint8_t db_klen = 0;
+    uint32_t vlen32;
     tn_stream *st;
 
     n_assert(it->_get_flag == 0);
@@ -588,56 +591,59 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, size_t *klen,
     it->_off += db_klen + 1;
     *voff = it->_off + sizeof(uint32_t);
     
-    if (!nn_stream_read_uint32_offs(st, vlen, it->_off))
+    if (!nn_stream_read_uint32_offs(st, &vlen32, it->_off))
         return 0;
-
-    //DBGF("val[%d] (%d)\n", it->_offs, *vlen);
+    
+    *vlen = vlen32;
     it->_off += *vlen + sizeof(uint32_t);
     it->_nrec++;
-    
+    //DBGF("val[%d] (%d)\n", it->_offs, *vlen);
     return *vlen;
 }
 
 
-int tndb_it_get(struct tndb_it *it, void *key, size_t *klen,
-                void *val, size_t *vlen_)
+int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
+                void *val, unsigned int *avlen)
 {
-    off_t  voff;
-    size_t vlen;
-    int rc = 0;
+    off_t        voff;
+    unsigned int vlen;
+    int          rc = 0;
 
-    if (tndb_it_get_voff(it, key, klen, &voff, &vlen) && (vlen + 1) < *vlen_) {
-        *vlen_ = vlen;
-        rc = (n_stream_read(it->_db->st, val, vlen) == (int)vlen);
-        if (rc)
-            ((char*)val)[vlen] = '\0';
+    if (!tndb_it_get_voff(it, key, klen, &voff, &vlen))
+        return 0;
+    
+    if ((vlen + 1) > *avlen) {
+        n_die("tndb: not enough space for data (%d < %d)\n", vlen, *avlen);
+        return 0;
     }
+
+    *avlen = vlen;
+    rc = (n_stream_read(it->_db->st, val, vlen) == (int)vlen);
+    if (rc)
+        ((char*)val)[vlen] = '\0';
 
     return rc;
 }
 
 
-int tndb_it_get_begin(struct tndb_it *it, 
-                      void *key, size_t *klen, 
-                      size_t *vlen_)
+int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen, 
+                      unsigned int *avlen)
 {
-    off_t    voff = 0;
-    uint32_t vlen = 0;
+    off_t        voff = 0;
+    unsigned int vlen = 0;
 
     n_assert(it->_get_flag == 0);
 
-    if (tndb_it_get_voff(it, key, klen, &voff, &vlen)) {
-        n_stream_seek(it->_db->st, voff, SEEK_SET);
-        it->_get_flag = 1;
-        if (vlen_)
-            *vlen_ = vlen;
-        
-        //printf("tndb_it_get_begin %lu + %lu => %lu\n", voff, vlen, it->_off);
-        return 1;
-        
-    }
+    if (!tndb_it_get_voff(it, key, klen, &voff, &vlen))
+        return 0;
     
-    return 0;
+    n_stream_seek(it->_db->st, voff, SEEK_SET);
+    it->_get_flag = 1;
+    
+    if (avlen)
+        *avlen = vlen;
+    //printf("tndb_it_get_begin %lu + %lu => %lu\n", voff, vlen, it->_off);
+    return 1;
 }
 
 
@@ -663,7 +669,7 @@ int tndb_it_get_end(struct tndb_it *it)
 }
 
 
-int tndb_read(struct tndb *db, long offs, void *buf, size_t size)
+int tndb_read(struct tndb *db, long offs, void *buf, unsigned int size)
 {
     if (n_stream_seek(db->st, offs, SEEK_SET) == -1)
         return -1;

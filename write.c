@@ -84,7 +84,7 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
     return db;
 }
 
-static inline int put_key(struct tndb *db, const char *key, size_t klen_)
+static inline int put_key(struct tndb *db, const char *key, unsigned int aklen)
 {
     uint32_t               hv, hv_i;
     tn_array               *ht;
@@ -93,9 +93,9 @@ static inline int put_key(struct tndb *db, const char *key, size_t klen_)
 
     n_assert(db->rtflags & TNDB_R_MODE_W);
 
-    if (klen_ > UINT8_MAX)
+    if (aklen > UINT8_MAX)
         n_die("Key is too long (max is %d)\n", UINT8_MAX);
-    klen = klen_;
+    klen = aklen;
 
     if ((db->hdr.flags & TNDB_NOHASH) == 0) {
         hv = tndb_hash(key, klen);
@@ -127,11 +127,11 @@ static inline int put_key(struct tndb *db, const char *key, size_t klen_)
 }
 
 
-int tndb_put(struct tndb *db, const char *key, size_t klen_,
-             const void *val, size_t vlen)
+int tndb_put(struct tndb *db, const char *key, unsigned int aklen,
+             const void *val, unsigned int vlen)
 {
 
-    if (!put_key(db, key, klen_))
+    if (!put_key(db, key, aklen))
         return 0;
 
     if (!n_stream_write_uint32(db->st, vlen))
@@ -259,7 +259,7 @@ static int htt_compute(struct tndb *db)
 
 static int tndbw_close(struct tndb *db)
 {
-    size_t nread, ntotal;
+    unsigned int nread, ntotal;
     char   buf[1024 * 16];
     int    fdin = -1, fdout = -1, type, rc;
 

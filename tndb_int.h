@@ -26,7 +26,7 @@ struct tndb_sign {
 };
 
 void tndb_sign_init(struct tndb_sign *sign);
-void tndb_sign_update(struct tndb_sign *sign, const void *buf, size_t size);
+void tndb_sign_update(struct tndb_sign *sign, const void *buf, unsigned int size);
 void tndb_sign_update_int32(struct tndb_sign *sign, uint32_t v);
 void tndb_sign_final(struct tndb_sign *sign);
 int  tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags);
@@ -100,7 +100,7 @@ void tndb_free(struct tndb *db);
 
 
 static inline
-int nn_stream_read_offs(tn_stream *st, void *buf, size_t size, uint32_t offs)
+int nn_stream_read_offs(tn_stream *st, void *buf, unsigned int size, uint32_t offs)
 {
     if (st->seek(st->stream, offs, SEEK_SET) == -1)
         return -1;

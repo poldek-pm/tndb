@@ -28,7 +28,6 @@
 
 struct tndb;
 
-
 #define TNDB_SIGN_DIGEST  (1 << 0)
 
 #define TNDB_NOHASH       (1 << 7)         /* build db without hash table */
@@ -37,8 +36,8 @@ struct tndb;
 /* creates new database */
 struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags);
 
-int tndb_put(struct tndb *db, const char *key, size_t klen,
-             const void *val, size_t vlen);
+int tndb_put(struct tndb *db, const char *key, unsigned int klen,
+             const void *val, unsigned int vlen);
 
 /* opens *existing* database */
 struct tndb *tndb_open(const char *path);
@@ -56,17 +55,16 @@ tn_stream *tndb_tn_stream(const struct tndb *db);
 const char *tndb_path(const struct tndb *db);
 
 
-int tndb_get(struct tndb *db, const void *key, size_t klen,
-             void *val, size_t size);
+int tndb_get(struct tndb *db, const void *key, unsigned int klen,
+             void *val, unsigned int valsize);
 
 int tndb_get_str(struct tndb *db, const char *key,
-                 unsigned char *val, size_t size);
+                 unsigned char *val, unsigned int valsize);
 
-int tndb_get_voff(struct tndb *db, const void *key, size_t klen,
-                  off_t *voffset, size_t *vlen);
+int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
+                  off_t *voffs, unsigned int *vlen);
 
-
-int tndb_read(struct tndb *db, long offs, void *buf, size_t size);
+int tndb_read(struct tndb *db, long offs, void *buf, unsigned int size);
 
 
 /* iterator */
@@ -87,17 +85,16 @@ int tndb_it_start(struct tndb *db, struct tndb_it *it);
   key size must be at least TNDB_KEY_MAX + 1 bytes
   if key is NULL then keys are not retrieved 
  */
-int tndb_it_get(struct tndb_it *it, void *key, size_t *klen,
-                void *val, size_t *vlen);
+int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
+                void *val, unsigned int *vlen);
 
-int tndb_it_get_voff(struct tndb_it *it, void *key, size_t *klen,
-                     off_t *voff, size_t *vlen);
+int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
+                     off_t *voff, unsigned int *vlen);
 
 /* for reading directly from db's stream */
-int tndb_it_get_begin(struct tndb_it *it, void *key, size_t *klen,
-                      size_t *vlen);
+int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,
+                      unsigned int *vlen);
 int tndb_it_get_end(struct tndb_it *it);
-
 
 
 tn_array *tndb_keys(struct tndb *db);
