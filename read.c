@@ -560,7 +560,7 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
                      off_t *voff, unsigned int *vlen)
 {
     uint8_t db_klen = 0;
-    uint32_t vlen32;
+    uint32_t vlen32 = 0;
     tn_stream *st;
 
     n_assert(it->_get_flag == 0);
@@ -593,6 +593,8 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
     
     if (!nn_stream_read_uint32_offs(st, &vlen32, it->_off))
         return 0;
+
+    DBGF("vlen of key %s = %d\n", key ? key : "(null)", vlen32);
     
     *vlen = vlen32;
     it->_off += *vlen + sizeof(uint32_t);
@@ -613,7 +615,7 @@ int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
         return 0;
     
     if ((vlen + 1) > *avlen) {
-        n_die("tndb: not enough space for data (%d < %d)\n", vlen, *avlen);
+        n_die("tndb: not enough space for data (%d > %d)\n", vlen, *avlen);
         return 0;
     }
 
