@@ -7,8 +7,18 @@
 # include "config.h"
 #endif
 
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
+
+/* FreeBSD does not provide PATH_MAX (syslimits.h is not for user) */
+#ifndef PATH_MAX 
+# if defined(FILENAME_MAX)
+#  define PATH_MAX FILENAME_MAX
+# elif defined(_POSIX_PATH_MAX)
+#  defined PATH_MAX _POSIX_PATH_MAX
+# endif 
+#endif 
 
 #include <trurl/narray.h>
 #include <trurl/nstream.h>

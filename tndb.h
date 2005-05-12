@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>          /* for off_t */
 
 #define TNDB_KEY_MAX 255
 
