@@ -22,6 +22,7 @@
 
 #include <trurl/narray.h>
 #include <trurl/nstream.h>
+#include <trurl/nmalloc.h>
 
 #define TNDB_FILEFMT_MAJOR     1
 #define TNDB_FILEFMT_MINOR     0
@@ -101,7 +102,7 @@ struct tndb {
     tn_array                 *htt[TNDB_HTSIZE];  /* arary of tn_array ptr of
                                                     tndb_hent */
     char                     errmsg[128];
-    void                     *obstack;
+    tn_alloc                 *na;
     int                      _refcnt;
 };
 

@@ -27,12 +27,6 @@
 #include <trurl/nmalloc.h>
 #include <trurl/n2h.h>
 
-#ifdef HAVE_OBSTACK_H
-# define obstack_chunk_alloc  malloc
-# define obstack_chunk_free   free
-# include <obstack.h>
-#endif
-
 #include "tndb_int.h"
 #include "tndb.h"
 
@@ -401,14 +395,9 @@ struct tndb_hent *tndb_hent_new(struct tndb *db, uint32_t val, uint32_t offs)
 {
     struct tndb_hent *h = NULL;
 
-#ifdef HAVE_OBSTACK_H
     n_assert(db);
-    n_assert(db->obstack);
-    h = obstack_alloc(db->obstack, sizeof(*h));
-#else 
-    h = n_malloc(sizeof(*h));
-#endif
-    
+    n_assert(db->na);
+    h = db->na->na_malloc(db->na, sizeof(*h));
     h->val = val;
     h->offs = offs;
     
@@ -417,10 +406,7 @@ struct tndb_hent *tndb_hent_new(struct tndb *db, uint32_t val, uint32_t offs)
 
 void tndb_hent_free(void *ptr)
 {
-#ifndef HAVE_OBSTACK_H
-    free(ptr);
-#endif
-    ptr = ptr;
+    ptr = ptr;                  /* do nothing, obstack is used */
 }
 
 
@@ -469,12 +455,7 @@ struct tndb *tndb_new(unsigned flags)
         db->htt[i] = NULL;
     *db->errmsg = '\0';
 
-    db->obstack = NULL;
-#ifdef HAVE_OBSTACK_H
-    db->obstack = n_malloc(sizeof(struct obstack));
-    obstack_init(db->obstack);
-#endif    
-
+    db->na = n_alloc_new(1024 * 64, TN_ALLOC_OBSTACK);
     return db;
 }
 
@@ -499,16 +480,10 @@ void tndb_free(struct tndb *db)
         db->path = NULL;
     }
 
-#ifndef HAVE_OBSTACK_H
-    n_assert(db->obstack == NULL);
-#else     
-    if (db->obstack) {
-        obstack_free(db->obstack, NULL);
-        free(db->obstack);
-        db->obstack = NULL;
+    if (db->na) {
+        n_alloc_free(db->na);
+        db->na = NULL;
     }
-#endif
-    
     free(db);
 }
 

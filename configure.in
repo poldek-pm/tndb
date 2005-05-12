@@ -17,7 +17,7 @@ AC_SUBST(AM_CFLAGS)
 dnl Checks for header files.
 AC_HEADER_STDC
 AC_C_INLINE
-AC_CHECK_HEADERS(limits.h obstack.h)
+AC_CHECK_HEADERS(limits.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

@@ -2,6 +2,7 @@
    
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 #include <trurl/nmalloc.h>
 
@@ -45,7 +46,7 @@ int test_creat(const char *name, int items)
     printf("\n\nCreating %s with %d records...", name, items);
     fflush(stdout);
     
-    if ((db = tndb_creat(name, TNDB_SIGN_DIGEST)) == NULL) {
+    if ((db = tndb_creat(name, -1, TNDB_SIGN_DIGEST)) == NULL) {
         perror("tndb_creat");
         return -1;
     }
@@ -86,7 +87,7 @@ int test_creat_bigdata(const char *name, int items)
     printf("\n\nCreating %s with %d records...", name, items);
     fflush(stdout);
     
-    if ((db = tndb_creat(name, TNDB_SIGN_DIGEST)) == NULL) {
+    if ((db = tndb_creat(name, -1, TNDB_SIGN_DIGEST)) == NULL) {
         perror("tndb_creat");
         return -1;
     }
@@ -290,7 +291,7 @@ int test_filedb(const char *name)
     printf("\n\nCreating %s with rpm -qla...", name);
     fflush(stdout);
     
-    if ((db = tndb_creat(name, 0)) == NULL) {
+    if ((db = tndb_creat(name, -1, 0)) == NULL) {
         perror("tndb_creat");
         return -1;
     }
