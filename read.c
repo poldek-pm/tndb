@@ -627,6 +627,32 @@ int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
     return rc;
 }
 
+int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
+                 void **val, unsigned int *avlen)
+{
+    off_t        voff;
+    unsigned int vlen;
+    int          rc = 0;
+
+    
+    if (!tndb_it_get_voff(it, key, klen, &voff, &vlen))
+        return 0;
+    
+    DBGF("%s avlen %d\n", key, *avlen);
+    if ((vlen + 1) > *avlen) {
+        DBGF("realloc avlen=%d, vlen=%d\n", *avlen, vlen);
+        *val = n_realloc(*val, vlen + 1);
+    }
+
+    *avlen = vlen;
+    rc = (n_stream_read(it->_db->st, *val, vlen) == (int)vlen);
+    if (rc)
+        ((char*)*val)[vlen] = '\0';
+
+    return rc;
+}
+
+
 
 int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen, 
                       unsigned int *avlen)

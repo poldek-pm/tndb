@@ -4,7 +4,7 @@ AUTOMAKE_OPTIONS = foreign
 AM_CFLAGS = @AM_CFLAGS@
 
 # use libtool versioning 
-TNDB_VERINFO   = 0:0:0
+TNDB_VERINFO   = 1:0:1
 
 lib_LTLIBRARIES  = libtndb.la
 libtndb_la_LDFLAGS = -version-info $(TNDB_VERINFO) -export-symbols tndb.sym
@@ -32,7 +32,7 @@ CLEANFILES = $(EXTRA_PROGRAMS) core *.o *.bak *~ *% *\# \#*
 
 tests:  $(EXTRA_PROGRAMS)
 
-all-local: 
+all-local:
 	@ln -sf .libs/libtndb.a libtndb.a
 
 #dist-hook:

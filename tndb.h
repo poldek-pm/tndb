@@ -89,6 +89,10 @@ int tndb_it_start(struct tndb *db, struct tndb_it *it);
 int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
                 void *val, unsigned int *vlen);
 
+/* same as tndb_it_get() but, *val is realloced() if needed */
+int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
+                 void **val, unsigned int *vlen);
+
 int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
                      off_t *voff, unsigned int *vlen);
 

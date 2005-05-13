@@ -13,6 +13,7 @@ tndb_get_voff
 tndb_read
 tndb_it_start
 tndb_it_get
+tndb_it_rget
 tndb_it_get_voff
 tndb_it_get_begin
 tndb_it_get_end
