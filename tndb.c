@@ -103,8 +103,8 @@ void tndb_sign_update(struct tndb_sign *sign, const void *buf, unsigned int size
 
 void tndb_sign_update_int32(struct tndb_sign *sign, uint32_t v)
 {
-    v = n_hton32(v);
-    tndb_sign_update(sign, &v, sizeof(v)); 
+    uint32_t vv = n_hton32(v);
+    tndb_sign_update(sign, &vv, sizeof(vv)); 
 }
 
 
@@ -295,7 +295,7 @@ static int hdr_write_uint32(struct tndb_hdr *hdr, tn_stream *st, uint32_t v, int
     if (write)
         return n_stream_write_uint32(st, v);
     else
-        tndb_sign_update(&hdr->sign, &v, sizeof(v));
+        tndb_sign_update_int32(&hdr->sign, v);
     
     return 1;
 }
