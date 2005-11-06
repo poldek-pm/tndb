@@ -113,10 +113,10 @@ void tndb_free(struct tndb *db);
 static inline
 int nn_stream_read_offs(tn_stream *st, void *buf, unsigned int size, uint32_t offs)
 {
-    if (st->seek(st->stream, offs, SEEK_SET) == -1)
+    if (st->st_seek(st->stream, offs, SEEK_SET) == -1)
         return -1;
     
-    return st->read(st->stream, buf, size);
+    return st->st_read(st->stream, buf, size);
 }
 
 static inline
@@ -125,7 +125,7 @@ int nn_stream_read_uint32_offs(tn_stream *st, uint32_t *val, uint32_t offs)
     int rc;
     
     *val = 0;
-    if (st->seek(st->stream, offs, SEEK_SET) == -1) 
+    if (st->st_seek(st->stream, offs, SEEK_SET) == -1) 
         return 0;
 
     rc = n_stream_read_uint32(st, val);
