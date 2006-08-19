@@ -455,7 +455,7 @@ struct tndb *tndb_new(unsigned flags)
         db->htt[i] = NULL;
     *db->errmsg = '\0';
 
-    db->na = n_alloc_new(1024 * 64, TN_ALLOC_OBSTACK);
+    db->na = n_alloc_new(64, TN_ALLOC_OBSTACK);
     return db;
 }
 
