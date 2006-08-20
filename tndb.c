@@ -172,7 +172,6 @@ int store_sig(tn_stream *st, const char *name, void *sig, int size)
         return 0;
     
     stsize += sizeof(ssize) + size;
-
     return stsize;
 }
 
@@ -371,19 +370,20 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
 
     size = sizeof(hdr->hdr);
     nerr += n_stream_read(st, hdr->hdr, size) != size;
-    if (!n_stream_read_uint8(st, &hdr->flags))
+    
+    if (nerr == 0 && !n_stream_read_uint8(st, &hdr->flags))
         nerr++;
 
-    if (!tndb_sign_restore(st, &hdr->sign, hdr->flags))
+    if (nerr == 0 && !tndb_sign_restore(st, &hdr->sign, hdr->flags))
         nerr++;
 
-    if (!n_stream_read_uint32(st, &hdr->ts))
+    if (nerr == 0 && !n_stream_read_uint32(st, &hdr->ts))
         nerr++;
     
-    if (!n_stream_read_uint32(st, &hdr->nrec))
+    if (nerr == 0 && !n_stream_read_uint32(st, &hdr->nrec))
         nerr++;
     
-    if (!n_stream_read_uint32(st, &hdr->doffs))
+    if (nerr == 0 && !n_stream_read_uint32(st, &hdr->doffs))
         nerr++;
 
     DBGF("nrec %u, doffs %u\n", hdr->nrec, hdr->doffs);
