@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2002 Pawel A. Gajda <mis@k2.net.pl>
+  Copyright (C) 2002 - 2007 Pawel A. Gajda <mis@pld-linux.org>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU Library General Public License, version 2
@@ -55,10 +55,12 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
 #ifdef HAVE_MKSTEMP
     fd = mkstemp(path);
 #else
-    fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0644);
+    fd = open(path, O_RDWR | O_CREAT | O_TRUNC | O_EXCL, 0600);
 #endif
     if (fd < 0)
         return NULL;
+
+    fchmod(fd, 0600);
     
     rmdir(path);
     unlink(path); /* unlink just after create, it's temporary file */
