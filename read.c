@@ -49,11 +49,11 @@ inline int verify_db(struct tndb *db)
 
 
 static
-int md5(FILE *stream, unsigned char *md, int *md_size)
+int md5(FILE *stream, unsigned char *md, unsigned *md_size)
 {
     unsigned char buf[8*1024];
     EVP_MD_CTX ctx;
-    int n, nn = 0;
+    unsigned n, nn = 0;
 
 
     n_assert(md_size && *md_size);
@@ -79,17 +79,17 @@ int md5(FILE *stream, unsigned char *md, int *md_size)
 }
 
 static
-int md5hex(FILE *stream, unsigned char *mdhex, int *mdhex_size)
+int md5hex(FILE *stream, unsigned char *mdhex, unsigned *mdhex_size)
 {
     unsigned char md[128];
-    int  md_size = sizeof(md);
+    unsigned md_size = sizeof(md);
 
     
     if (md5(stream, md, &md_size)) {
         int i, n = 0, nn = 0;
         
-        for (i=0; i < md_size; i++) {
-            n = n_snprintf(mdhex + nn, *mdhex_size - nn, "%02x", md[i]);
+        for (i=0; i < (int)md_size; i++) {
+            n = n_snprintf((char*)mdhex + nn, *mdhex_size - nn, "%02x", md[i]);
             nn += n;
         }
         *mdhex_size = nn;
@@ -111,8 +111,7 @@ int make_md5(const char *pathname)
     FILE            *stream;
     unsigned char   md[128];
     char            path[PATH_MAX];
-    int             md_size = sizeof(md);
-
+    unsigned        md_size = sizeof(md);
     
     if ((stream = fopen(pathname, "r")) == NULL)
         return 0;
@@ -139,8 +138,9 @@ int verify_md5(const char *pathname)
 {
     FILE            *stream;
     unsigned char   md1[DIGEST_SIZE_MD5 + 1], md2[DIGEST_SIZE_MD5 + 1];
-    int             fd, md1_size, md2_size;
+    unsigned        md1_size, md2_size;
     char            path[PATH_MAX];
+    int             fd;
 
     snprintf(path, sizeof(path), "%s.md5", pathname);
     if ((fd = open(path, O_RDONLY)) < 0)
@@ -510,10 +510,12 @@ tn_array *tndb_keys(struct tndb *db)
 {
     struct tndb_it  it;
     char            key[TNDB_KEY_MAX + 1];
-    int             klen, vlen, rc;
+    unsigned        klen, vlen;
     tn_array        *keys;
     off_t           voffs;
+    int             rc;
 
+    
     if (!verify_db(db))
         return NULL;
     

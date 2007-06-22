@@ -73,7 +73,7 @@ int do_walk(const char *name, unsigned flags)
             return -1;
         }
 
-        printf("%s\n", key);
+        printf("KEY = %s\n", key);
         if (flags & DUMP_DATA) {
             unsigned char *buf, *p;
             int i;
@@ -90,7 +90,7 @@ int do_walk(const char *name, unsigned flags)
                 if (!isprint(buf[i]))
                     buf[i] = '.';
             
-            printf("%s\n\n", buf);
+            printf("DATA = %s\n\n--------------------------------------------------\n", buf);
         }
     }
     return 0;

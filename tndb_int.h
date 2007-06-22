@@ -63,12 +63,10 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st);
                tndb_sign_update(hdr->sign, buf, size); \
       } while(0);   
 
-
-
-
+/* hash entry */
 struct tndb_hent {
-    uint32_t val;
-    uint32_t offs;
+    uint32_t val;               /* hashed key */
+    uint32_t offs;              /* offset in file */
 };
 
 struct tndb;
@@ -144,9 +142,6 @@ int nn_stream_read_uint32_offs(tn_stream *st, uint32_t *val, uint32_t offs)
 # define DBGF(fmt, args...)  ((void) 0)
 # define DBG(fmt, args...)    ((void) 0)
 #endif
-
-#define DBGMSG_F DBGF
-#define DBGMSG   DBG
 
 #define DBGF_NULL(fmt, args...) ((void) 0)
 #define DBGF_F(fmt, args...) fprintf(stdout, "%-18s: " fmt, __FUNCTION__ , ## args)

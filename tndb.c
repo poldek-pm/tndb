@@ -23,6 +23,7 @@
 
 #include <openssl/evp.h>
 
+#include <trurl/n_snprintf.h>
 #include <trurl/nassert.h>
 #include <trurl/nmalloc.h>
 #include <trurl/n2h.h>
@@ -111,7 +112,7 @@ void tndb_sign_update_int32(struct tndb_sign *sign, uint32_t v)
 void tndb_sign_final(struct tndb_sign *sign) 
 {
     unsigned char buf[1024];
-    int n;
+    unsigned n;
 
     //printf("%p %p >> FINAL\n", sign, sign->ctx);
     EVP_DigestFinal(sign->ctx, buf, &n);
@@ -282,8 +283,8 @@ void tndb_hdr_init(struct tndb_hdr *hdr, unsigned flags)
     memset(hdr, 0, sizeof(*hdr));
     hdr->flags |= flags;
     
-    snprintf(hdr->hdr, sizeof(hdr->hdr), "tndb%d.%d\n",
-             TNDB_FILEFMT_MAJOR, TNDB_FILEFMT_MINOR);
+    n_snprintf((char*)hdr->hdr, sizeof(hdr->hdr), "tndb%d.%d\n",
+               TNDB_FILEFMT_MAJOR, TNDB_FILEFMT_MINOR);
     
     if (flags & TNDB_SIGN_DIGEST)
         tndb_sign_init(&hdr->sign);

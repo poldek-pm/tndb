@@ -61,7 +61,7 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
         return NULL;
     
     rmdir(path);
-    unlink(path);
+    unlink(path); /* unlink just after create, it's temporary file */
 
     n = strlen(name);
     if (n > 3 && strcmp(&name[n - 3], ".gz") == 0) {
@@ -246,7 +246,8 @@ static int htt_write(struct tndb *db)
     return 1;
 }
 
-static int htt_compute(struct tndb *db)
+/* computes and writes htt's digest  */
+static int htt_compute_digest(struct tndb *db)
 {
     int rc;
     
@@ -275,7 +276,7 @@ static int tndbw_close(struct tndb *db)
     n_stream_close(db->st);
     db->st = NULL;
 
-    if ((fdout = open(db->path, O_RDWR | O_CREAT | O_TRUNC, 0644)) == -1)
+    if ((fdout = open(db->path, O_RDWR | O_CREAT | O_TRUNC, 0666)) == -1)
         goto l_end;
     
     if ((db->st = n_stream_dopen(fdout, "wb", type)) == NULL)
@@ -288,7 +289,7 @@ static int tndbw_close(struct tndb *db)
         tndb_hdr_compute_digest(&db->hdr);
     
         if ((db->hdr.flags & TNDB_NOHASH) == 0)
-            if (!htt_compute(db))
+            if (!htt_compute_digest(db))
                 goto l_end;
     
         

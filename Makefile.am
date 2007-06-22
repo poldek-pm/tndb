@@ -19,6 +19,8 @@ EXTRA_PROGRAMS = test_tndb tndb_dump
 test_tndb_LDADD = libtndb.la
 tndb_dump_LDADD = $(test_tndb_LDADD)
 
+DIST_SUBDIRS = tests
+
 MAINTAINERCLEANFILES =	mkinstalldirs install-sh missing *.tar.gz *.spec \
 			config.h.in configure Makefile.in config.h \
 			config.sub config.guess config.status config.log aclocal.m4 \
@@ -29,8 +31,6 @@ CLEANFILES = $(EXTRA_PROGRAMS) core *.o *.bak *~ *% *\# \#*
 
 #symlink: 
 #	@if [ ! -d tndb ]; then ln . tndb -s; fi;
-
-tests:  $(EXTRA_PROGRAMS)
 
 all-local:
 	@ln -sf .libs/libtndb.a libtndb.a
