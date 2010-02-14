@@ -45,7 +45,7 @@ static int st_write_hook_nowrite(const void *buf, size_t size, void *arg)
 
 struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
 {
-    char                path[PATH_MAX], mode[32] = "w+b";
+    char                path[PATH_MAX], mode[32] = "wb";
     tn_stream           *st;
     struct tndb         *db = NULL;
     int                 fd, n, type = TN_STREAM_STDIO;
@@ -69,7 +69,7 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
     if (n > 3 && strcmp(&name[n - 3], ".gz") == 0) {
         type = TN_STREAM_GZIO;
         if (comprlevel >= 0 && comprlevel < 10)
-            snprintf(mode, sizeof(mode), "w+b%d", comprlevel);
+            snprintf(mode, sizeof(mode), "wb%d", comprlevel);
     }
     
     if ((st = n_stream_dopen(fd, mode, type)) == NULL)
