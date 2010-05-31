@@ -22,9 +22,14 @@ libtool
 *.spec
 .deps
 *.lo
+*.o
 .libs
 *.la
 autom4te.cache
 stamp-h1
 test_tndb
 tndb_dump
+config.guess
+config.sub
+depcomp
+libtndb.a
