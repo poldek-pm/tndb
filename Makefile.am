@@ -7,7 +7,7 @@ AM_CFLAGS = @AM_CFLAGS@
 TNDB_VERINFO   = 1:0:1
 
 lib_LTLIBRARIES  = libtndb.la
-libtndb_la_LDFLAGS = -version-info $(TNDB_VERINFO) -export-symbols tndb.sym
+libtndb_la_LDFLAGS = -version-info $(TNDB_VERINFO) -export-symbols $(top_srcdir)/tndb.sym
 
 libtndb_la_SOURCES = write.c read.c tndb.c tndb_int.h
 pkgincludedir = $(includedir)/tndb

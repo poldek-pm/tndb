@@ -37,11 +37,11 @@ AC_CHECK_LIB(z, gzopen)
 
 dnl use local ../trurlib copy if it exists
 CONF_IN_LDFLAGS=
-if test -f "../trurlib/include/trurl/trurl.h"; then
+if test -f "${srcdir}/../trurlib/include/trurl/trurl.h"; then
 	AC_MSG_CHECKING(for local trurlib copy in ../trurlib)
 	AC_MSG_RESULT([yes])
 	CPPFLAGS="$CPPFLAGS -I\$(top_srcdir)/../trurlib/include/"
-	LDFLAGS="$LDFLAGS -L\$(top_srcdir)/../trurlib"
+	LDFLAGS="$LDFLAGS -L\$(top_builddir)/../trurlib"
 	LIBS="$LIBS -ltrurl"
 else 
 	AC_CHECK_HEADER(trurl/trurl.h,,AC_MSG_ERROR("trurl.h is missing"))
