@@ -1,5 +1,7 @@
 # $Id$
 
+SUBDIRS = data
+
 AUTOMAKE_OPTIONS = foreign
 AM_CFLAGS = @AM_CFLAGS@
 

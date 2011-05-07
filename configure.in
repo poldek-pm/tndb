@@ -49,5 +49,10 @@ else
 fi
 
 
-AC_CONFIG_FILES([ Makefile tests/Makefile ])
+AC_CONFIG_FILES([
+Makefile
+data/Makefile
+data/tndb.pc
+tests/Makefile
+])
 AC_OUTPUT

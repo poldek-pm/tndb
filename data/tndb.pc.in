@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: tndb
+Description: Library for creating and reading constant databases with key/data data pairs
+Version: @VERSION@
+Requires: trurlib
+Libs: -L${libdir} -ltndb
