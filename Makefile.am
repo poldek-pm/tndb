@@ -9,13 +9,13 @@ AM_CFLAGS = @AM_CFLAGS@
 TNDB_VERINFO   = 1:0:1
 
 lib_LTLIBRARIES  = libtndb.la
-libtndb_la_LDFLAGS = -version-info $(TNDB_VERINFO) -export-symbols $(top_srcdir)/tndb.sym
+libtndb_la_LDFLAGS = -version-info $(TNDB_VERINFO)
 
-libtndb_la_SOURCES = write.c read.c tndb.c tndb_int.h
+libtndb_la_SOURCES = compiler.h write.c read.c tndb.c tndb_int.h
 pkgincludedir = $(includedir)/tndb
 pkginclude_HEADERS = tndb.h
 
-EXTRA_DIST = Makefile.extra tndb.sym
+EXTRA_DIST = Makefile.extra
 
 EXTRA_PROGRAMS = test_tndb tndb_dump
 test_tndb_LDADD = libtndb.la

@@ -25,6 +25,7 @@
 #include <trurl/nassert.h>
 
 #define ENABLE_TRACE 0
+#include "compiler.h"
 #include "tndb_int.h"
 #include "tndb.h"
 

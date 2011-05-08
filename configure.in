@@ -1,5 +1,4 @@
 dnl Process this file with autoconf to produce a configure script.
-dnl $Id$
 
 AC_INIT(tndb.h)
 AM_INIT_AUTOMAKE(tndb, 0.1)
@@ -13,6 +12,24 @@ AM_PROG_LIBTOOL
 
 AM_CFLAGS="-Wall -W"
 AC_SUBST(AM_CFLAGS)
+
+if test -n "$GCC"; then
+	cflags_save="$CFLAGS"
+	CFLAGS="$CFLAGS -fvisibility=hidden"
+	AC_MSG_CHECKING([whether gcc supports visibility])
+	AC_TRY_COMPILE(
+		[extern __attribute__((visibility("hidden"))) int hiddenvar;
+		 extern __attribute__((visibility("default"))) int exportedvar;
+		 extern __attribute__((visibility("hidden"))) void hiddenfunc();
+		 extern __attribute__((visibility("default"))) void exportedfunc();],
+		[],
+		AC_MSG_RESULT(yes),
+		[
+		  AC_MSG_WARN([compiler does not support visibility])
+		  CFLAGS="$cflags_save"
+		]
+	)
+fi
 
 dnl Checks for header files.
 AC_HEADER_STDC

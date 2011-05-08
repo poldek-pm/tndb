@@ -28,6 +28,7 @@
 #include <trurl/nmalloc.h>
 #include <trurl/n2h.h>
 
+#include "compiler.h"
 #include "tndb_int.h"
 #include "tndb.h"
 
