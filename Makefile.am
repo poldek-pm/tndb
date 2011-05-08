@@ -1,6 +1,3 @@
-# $Id$
-
-SUBDIRS = data
 
 AUTOMAKE_OPTIONS = foreign
 AM_CFLAGS = @AM_CFLAGS@
@@ -21,7 +18,8 @@ EXTRA_PROGRAMS = test_tndb tndb_dump
 test_tndb_LDADD = libtndb.la
 tndb_dump_LDADD = $(test_tndb_LDADD)
 
-DIST_SUBDIRS = tests
+SUBDIRS = data
+DIST_SUBDIRS = $(SUBDIRS) tests
 
 MAINTAINERCLEANFILES =	mkinstalldirs install-sh missing *.tar.gz *.spec \
 			config.h.in configure Makefile.in config.h \
