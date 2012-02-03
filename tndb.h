@@ -55,9 +55,20 @@ EXPORT struct tndb *tndb_ref(struct tndb *db);
 EXPORT tn_stream *tndb_tn_stream(const struct tndb *db);
 EXPORT const char *tndb_path(const struct tndb *db);
 
-
+/**
+* Reads value associated with key. Buffer (val) must be long enough to hold the whole value.
+* Returns number of bytes that was read into buffer.
+*/
 EXPORT int tndb_get(struct tndb *db, const void *key, unsigned int klen,
         	    void *val, unsigned int valsize);
+
+/**
+* This function is similar to tndb_get(), except it uses dynamically allocated buffer, which
+* can hold the whole value regardless of its length and should be freed when no
+* longer needed.
+*/
+EXPORT size_t tndb_get_all(struct tndb *db, const void *key, size_t klen,
+        	           void **val);
 
 EXPORT int tndb_get_str(struct tndb *db, const char *key,
 			unsigned char *val, unsigned int valsize);

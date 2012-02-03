@@ -253,13 +253,11 @@ int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st)
     unsigned char buf[4096];
     struct tndb_sign sign;
     int n, nread;
-    long off;
     
 
     sign = hdr->sign;
     tndb_sign_init(&hdr->sign);
 
-    off = n_stream_tell(st);
     n_stream_seek(st, hdr->doffs, SEEK_SET);
     
     while ((nread = n_stream_read(st, buf, sizeof(buf))) > 0)
@@ -490,6 +488,26 @@ int tndb_get(struct tndb *db, const void *key, unsigned int klen,
         nread = nn_stream_read_offs(db->st, val, vlen, voffs);
         if (nread != (int)vlen)
             nread = 0;
+    }
+    
+    return nread;
+}
+
+size_t tndb_get_all(struct tndb *db, const void *key, size_t klen,
+		    void **val)
+{
+    off_t  voffs;
+    size_t nread = 0, vlen;
+    
+    if (tndb_get_voff(db, key, klen, &voffs, &vlen)) {
+	*val = n_malloc(vlen + 1); /* extra byte for \0 */
+	
+	nread = nn_stream_read_offs(db->st, *val, vlen, voffs);
+	
+	if (nread != vlen) {
+	    nread = 0;
+	    n_cfree(val);
+	}
     }
     
     return nread;
