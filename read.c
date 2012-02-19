@@ -497,7 +497,8 @@ size_t tndb_get_all(struct tndb *db, const void *key, size_t klen,
 		    void **val)
 {
     off_t  voffs;
-    size_t nread = 0, vlen;
+    size_t nread = 0;
+    unsigned int vlen;
     
     if (tndb_get_voff(db, key, klen, &voffs, &vlen)) {
 	*val = n_malloc(vlen + 1); /* extra byte for \0 */
