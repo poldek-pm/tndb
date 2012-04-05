@@ -1,5 +1,4 @@
 #!/bin/sh
-# $Id$
 
 FILE=tndb.h
 PKG=tndb
@@ -25,6 +24,6 @@ runcmd automake --add-missing --no-force
 runcmd autoconf
 
 if [ -z "$1" -o "$1" != "--no-configure" ]; then
-	CONFOPTS="--enable-maintainer-mode --enable-compile-warnings $@"
+	CONFOPTS="--enable-maintainer-mode $@"
 	runcmd ./configure $CONFOPTS
 fi
