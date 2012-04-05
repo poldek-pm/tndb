@@ -46,7 +46,8 @@ int do_walk(const char *name, unsigned flags)
     struct tndb     *db;
     struct tndb_it  it;
     char            key[TNDB_KEY_MAX + 1];
-    int             kn, rc, nrec;
+    int             rc;
+    unsigned int    kn;
 
     if ((db = tndb_open(name)) == NULL) {
         fprintf(stderr, "%s: %m", name);
@@ -63,9 +64,7 @@ int do_walk(const char *name, unsigned flags)
         fprintf(stderr, "%s: tndb_it_start failed", name);
         return -1;
     }
-    
-    
-    nrec = 0;
+
     while ((rc = tndb_it_get_voff(&it, key, &kn, &voffs, &vlen))) {
         
         if (rc < 0) {
@@ -75,9 +74,8 @@ int do_walk(const char *name, unsigned flags)
 
         printf("KEY = %s\n", key);
         if (flags & DUMP_DATA) {
-            unsigned char *buf, *p;
+            unsigned char *buf;
             int i;
-
             
             buf = n_malloc(vlen + 1);
             if (tndb_read(db, voffs, buf, vlen) != (int)vlen) {
@@ -85,7 +83,6 @@ int do_walk(const char *name, unsigned flags)
                 return -1;
             }
 
-            p = buf;
             for (i=0; i < (int)vlen; i++) 
                 if (!isprint(buf[i]))
                     buf[i] = '.';

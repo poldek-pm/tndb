@@ -96,13 +96,13 @@ int test_creat_bigdata(const char *name, int items)
     for (i = 0; i < items; i++) {
         char key[40], val[10 * 1024],
             *fmt = "val%%.%dd", valfmt[256];
-        int kn, vn;
+        int kn;
         
         kn = snprintf(key, sizeof(key), "key%.8d", i);
         memset(val, 0, sizeof(val));
         snprintf(valfmt, sizeof(valfmt), fmt, i);
         
-        vn = snprintf(val, sizeof(val), valfmt, i);
+        snprintf(val, sizeof(val), valfmt, i);
 
         if (!tndb_put(db, key, kn, val, sizeof(val))) {
             perror("tndb_add");
@@ -143,7 +143,7 @@ int test_lookup(const char *name, int items)
     for (i = 0; i < items + (items/2); i++) {
         //for (i = items + (items/2); i > -1; i--) {
         char key[40], val[1024 * 32], *fmt = "val%%.%dd", valfmt[256];
-        int kn, vn, rc;
+        int kn, rc;
 
         if (i % (items / 5) == 0) {
             printf("%d..", i);
@@ -153,7 +153,7 @@ int test_lookup(const char *name, int items)
         kn = snprintf(key, sizeof(key), "key%.8d", i);
         snprintf(valfmt, sizeof(valfmt), fmt, i);
             
-        vn = snprintf(val, sizeof(val), valfmt, i);
+        snprintf(val, sizeof(val), valfmt, i);
             
         if ((rc = tndb_get_voff(db, key, kn, &voffs, &vlen)) < 0) {
             printf("Error while reading key %s (%d): %m\n", key, rc);
@@ -202,7 +202,8 @@ int test_walk(const char *name, int items, int with_keys)
     struct tndb_it it;
     char key[TNDB_KEY_MAX + 1], val[1024 * 32], *fmt = "val%%.%dd", valfmt[256];
     char *keyp = NULL;
-    int kn, vn, rc, nrec;
+    int rc, nrec;
+    unsigned int kn;
 
     if (with_keys)
         keyp = key;
@@ -258,7 +259,7 @@ int test_walk(const char *name, int items, int with_keys)
         }
         
         snprintf(valfmt, sizeof(valfmt), fmt, i);
-        vn = snprintf(val, sizeof(val), valfmt, i);
+        snprintf(val, sizeof(val), valfmt, i);
         
         if (tndb_read(db, voffs, buf, vlen) != (int)vlen) {
             perror("Error while reading data\n");
@@ -297,7 +298,7 @@ int test_filedb(const char *name)
     }
     
     while (fgets(buf, sizeof(buf), stream)) {
-        char key[40], val[1024 * 32], *fmt = "val%%.%dd", valfmt[256];
+        char key[40], val[1024 * 32];
         int kn, vn;
         
         kn = snprintf(key, sizeof(key), "%d", i);
