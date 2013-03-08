@@ -328,7 +328,8 @@ static int tndbw_close(struct tndb *db)
         ntotal += nread;
     }
 
-    rc = 1;
+    if (nread != -1)
+        rc = 1;
     
  l_end:
     tndb_free(db);
