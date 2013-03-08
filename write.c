@@ -178,7 +178,7 @@ static uint32_t htt_store_size(struct tndb *db)
 
 static int htt_write(struct tndb *db)
 {
-    int i, j;
+    unsigned int i, j;
     uint32_t data_offs, htt_size, ht_offs;
 
     n_assert((db->hdr.flags & TNDB_NOHASH) == 0);
@@ -263,7 +263,7 @@ static int htt_compute_digest(struct tndb *db)
 
 static int tndbw_close(struct tndb *db)
 {
-    unsigned int nread, ntotal;
+    ssize_t nread, ntotal;
     char   buf[1024 * 16];
     int    fdin = -1, fdout = -1, type, rc;
 
