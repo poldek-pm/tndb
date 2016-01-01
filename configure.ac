@@ -15,6 +15,8 @@ AM_INIT_AUTOMAKE([1.11 foreign no-dist-gzip dist-xz])
 AM_MAINTAINER_MODE([enable])
 AM_SILENT_RULES([no])
 
+AC_SYS_LARGEFILE
+
 # Checks for programs.
 m4_ifdef([LT_INIT], [LT_INIT], [AC_PROG_LIBTOOL])
 AC_PROG_CC
