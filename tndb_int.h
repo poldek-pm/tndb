@@ -1,11 +1,5 @@
-/* $Id$ */
-
 #ifndef TNDB_INTERNAL_H
 #define TNDB_INTERNAL_H
-
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
 
 #include <limits.h>
 #include <stdint.h>
