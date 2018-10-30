@@ -85,13 +85,13 @@ char *tndb_bin2hex_s(const unsigned char *bin, int bin_size)
 //static
 void tndb_sign_init(struct tndb_sign *sign) 
 {
-    EVP_MD_CTX ctx;
+    EVP_MD_CTX *ctx;
     
     memset(sign, 0, sizeof(*sign));
     
-    EVP_DigestInit(&ctx, EVP_sha1());
-    sign->ctx = n_malloc(sizeof(ctx));
-    memcpy(sign->ctx, &ctx, sizeof(ctx));
+    ctx = EVP_MD_CTX_create();
+    EVP_DigestInit(ctx, EVP_sha1());
+    sign->ctx = ctx;
     //printf("%p %p >> INIT\n", sign, sign->ctx);
 }
 
@@ -122,8 +122,8 @@ void tndb_sign_final(struct tndb_sign *sign)
         *sign->md = '\0';
     else
         memcpy(sign->md, buf, n);
-    
-    free(sign->ctx);
+   
+    EVP_MD_CTX_destroy((EVP_MD_CTX *)sign->ctx); 
     sign->ctx = NULL;
     
 }

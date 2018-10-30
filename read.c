@@ -35,7 +35,7 @@
 
 //static char *msg_not_verified = "tndb: %s: refusing read unchecked file\n";
 
-inline int verify_db(struct tndb *db)
+static inline int verify_db(struct tndb *db)
 {
     if (db->rtflags & TNDB_R_SIGN_VRFIED)
         return 1;
@@ -53,20 +53,22 @@ static
 int md5(FILE *stream, unsigned char *md, unsigned *md_size)
 {
     unsigned char buf[8*1024];
-    EVP_MD_CTX ctx;
+    EVP_MD_CTX *ctx;
     unsigned n, nn = 0;
 
 
     n_assert(md_size && *md_size);
 
-    EVP_DigestInit(&ctx, EVP_md5());
+    ctx = EVP_MD_CTX_create();
+    if (!EVP_DigestInit(ctx, EVP_md5()))
+        return 0;
 
     while ((n = fread(buf, 1, sizeof(buf), stream)) > 0) {
-        EVP_DigestUpdate(&ctx, buf, n);
+        EVP_DigestUpdate(ctx, buf, n);
         nn += n; 
     }
     
-    EVP_DigestFinal(&ctx, buf, &n);
+    EVP_DigestFinal(ctx, buf, &n);
 
     if (n > *md_size) {
         *md = '\0';
@@ -75,7 +77,9 @@ int md5(FILE *stream, unsigned char *md, unsigned *md_size)
         memcpy(md, buf, n);
         *md_size = n;
     }
-    
+
+    EVP_MD_CTX_destroy(ctx);
+
     return *md_size;
 }
 
