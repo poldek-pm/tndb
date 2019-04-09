@@ -6,13 +6,13 @@
 #include <stdio.h>
 
 /* FreeBSD does not provide PATH_MAX (syslimits.h is not for user) */
-#ifndef PATH_MAX 
+#ifndef PATH_MAX
 # if defined(FILENAME_MAX)
 #  define PATH_MAX FILENAME_MAX
 # elif defined(_POSIX_PATH_MAX)
 #  defined PATH_MAX _POSIX_PATH_MAX
-# endif 
-#endif 
+# endif
+#endif
 
 #include <trurl/narray.h>
 #include <trurl/nstream.h>
@@ -24,7 +24,7 @@
 
 uint32_t tndb_hash(const void *d, register uint8_t size);
 
-#define TNDBSIGN_OFFSET       9 /* hdr[8] + sizeof(flsgs) */
+#define TNDBSIGN_OFFSET       9 /* hdr[8] + sizeof(flags) */
 struct tndb_sign {
     void           *ctx;
     unsigned char  md[20];      /* sha */
@@ -36,10 +36,10 @@ void tndb_sign_update_int32(struct tndb_sign *sign, uint32_t v);
 void tndb_sign_final(struct tndb_sign *sign);
 int  tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags);
 
-                            
+
 struct tndb_hdr {
     unsigned char      hdr[8];
-    uint8_t            flags; 
+    uint8_t            flags;
     struct tndb_sign   sign;        /* signatures, variable length  */
     uint32_t           ts;          /*  */
     uint32_t           nrec;        /* number of records */
@@ -55,7 +55,7 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st);
 #define tndb_hdr_upsign(hdr, buf, size)                \
       do { if (hdr->flags & TNDBHDR_SIGN)              \
                tndb_sign_update(hdr->sign, buf, size); \
-      } while(0);   
+      } while(0);
 
 /* hash entry */
 struct tndb_hent {
@@ -107,7 +107,7 @@ int nn_stream_read_offs(tn_stream *st, void *buf, unsigned int size, uint32_t of
 {
     if (st->st_seek(st->stream, offs, SEEK_SET) == -1)
         return -1;
-    
+
     return st->st_read(st->stream, buf, size);
 }
 
@@ -115,9 +115,9 @@ static inline
 int nn_stream_read_uint32_offs(tn_stream *st, uint32_t *val, uint32_t offs)
 {
     int rc;
-    
+
     *val = 0;
-    if (st->st_seek(st->stream, offs, SEEK_SET) == -1) 
+    if (st->st_seek(st->stream, offs, SEEK_SET) == -1)
         return 0;
 
     rc = n_stream_read_uint32(st, val);
@@ -132,7 +132,7 @@ int nn_stream_read_uint32_offs(tn_stream *st, uint32_t *val, uint32_t offs)
 #if ENABLE_TRACE
 # define DBGF(fmt, args...)  fprintf(stdout, "%-18s: " fmt, __FUNCTION__ , ## args)
 # define DBG(fmt, args...)   fprintf(stdout, fmt, ## args)
-#else 
+#else
 # define DBGF(fmt, args...)  ((void) 0)
 # define DBG(fmt, args...)    ((void) 0)
 #endif
@@ -140,6 +140,4 @@ int nn_stream_read_uint32_offs(tn_stream *st, uint32_t *val, uint32_t offs)
 #define DBGF_NULL(fmt, args...) ((void) 0)
 #define DBGF_F(fmt, args...) fprintf(stdout, "%-18s: " fmt, __FUNCTION__ , ## args)
 
-#endif 
-
-
+#endif
