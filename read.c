@@ -235,19 +235,20 @@ static int htt_read(struct tndb *db)
         }
 
         for (j=0; j < (int)ht_size; j++) {
-            uint32_t val, offs;
+            uint32_t val, hoffs;
             struct tndb_hent *he;
 
             if (!n_stream_read_uint32(db->st, &val))
                 return 0;
 
-            if (!n_stream_read_uint32(db->st, &offs))
+            if (!n_stream_read_uint32(db->st, &hoffs))
                 return 0;
 
             DBGF("at %ld h0[%d].h1[%d](%d) %d\n",
                  n_stream_tell(db->st) - (2 * sizeof(uint32_t)),
-                 i, j, val, offs);
-            he = tndb_hent_new(db, val, offs);
+                 i, j, val, hoffs);
+
+            he = tndb_hent_new(db, val, hoffs);
             n_array_push(ht, he);
         }
     }
@@ -260,7 +261,7 @@ int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st)
 {
     unsigned char buf[4096];
     struct tndb_sign sign;
-    int n, nread;
+    int rc, nread;
 
     sign = hdr->sign;
     tndb_sign_init(&hdr->sign);
@@ -292,18 +293,18 @@ int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st)
     }
 
     tndb_sign_final(&hdr->sign);
-    n = 0;
 
     DBGF("md_compute =\n %s\n %s\n => %d\n",
          (char*)tndb_debug_bin2hex_s(hdr->sign.md, sizeof(sign.md)),
          (char*)tndb_debug_bin2hex_s(sign.md, sizeof(sign.md)),
          memcmp(sign.md, hdr->sign.md, 1));
 
+    rc = 0;
     if (memcmp(sign.md, hdr->sign.md, sizeof(sign.md)) == 0)
-        n = 1;
+        rc = 1;
 
     hdr->sign = sign;
-    return n;
+    return rc;
 }
 
 static
