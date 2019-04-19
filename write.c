@@ -77,6 +77,12 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
             snprintf(mode, sizeof(mode), "wb%d", comprlevel);
     }
 
+    if (n > 4 && strcmp(&name[n - 4], ".zst") == 0) {
+        type = TN_STREAM_ZSTDIO;
+        if (comprlevel >= 0 && comprlevel < 10)
+            snprintf(mode, sizeof(mode), "wb%d", comprlevel);
+    }
+
     if ((st = n_stream_dopen(fd, mode, type)) == NULL)
         return NULL;
 
