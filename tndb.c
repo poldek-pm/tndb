@@ -395,7 +395,7 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
     if (nerr == 0 && !n_stream_read_uint32(st, &hdr->doffs))
         nerr++;
 
-    DBGF("nrec %u, doffs %u\n", hdr->nrec, hdr->doffs);
+    DBGF("nrec %u, doffs %u, errs %d\n", hdr->nrec, hdr->doffs, nerr);
 
     return nerr == 0;
 }
@@ -499,4 +499,19 @@ void tndb_free(struct tndb *db)
 const char *tndb_path(const struct tndb *db)
 {
     return db->path;
+}
+
+int tndb_detect_stream_type(const char *path)
+{
+    int type = TN_STREAM_STDIO;
+    int n = strlen(path);
+
+    if (n > 3 && strcmp(&path[n - 3], ".gz") == 0) {
+        type = TN_STREAM_GZIO;
+
+    } else if (n > 4 && strcmp(&path[n - 4], ".zst") == 0) {
+        type = TN_STREAM_ZSTDIO;
+    }
+
+    return type;
 }

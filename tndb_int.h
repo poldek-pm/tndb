@@ -124,6 +124,7 @@ int nn_stream_read_uint32_offs(tn_stream *st, uint32_t *val, uint32_t offs)
     return rc;
 }
 
+int tndb_detect_stream_type(const char *path);
 
 #ifndef ENABLE_TRACE
 # define ENABLE_TRACE 0

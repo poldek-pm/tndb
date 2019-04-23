@@ -30,7 +30,6 @@
 
 #include "compiler.h"
 #include "tndb.h"
-#define ENABLE_TRACE 0
 #include "tndb_int.h"
 
 //static char *msg_not_verified = "tndb: %s: refusing read unchecked file\n";
@@ -313,11 +312,9 @@ struct tndb *do_tndb_open(int fd, const char *path)
     struct tndb_hdr  hdr;
     tn_stream        *st;
     struct tndb      *db;
-    int              n, type = TN_STREAM_STDIO;
+    int              type;
 
-    n = strlen(path);
-    if (n > 3 && strcmp(&path[n - 3], ".gz") == 0)
-        type = TN_STREAM_GZIO;
+    type = tndb_detect_stream_type(path);
 
     if (fd > 0)
         st = n_stream_dopen(fd, "rb", type);
@@ -339,7 +336,7 @@ struct tndb *do_tndb_open(int fd, const char *path)
 
     db = tndb_new(0);
     db->offs.htt = n_stream_tell(st); /* just after the hdr */
-    db->path = n_strdupl(path, n);
+    db->path = n_strdup(path);
     db->st = st;
     db->rtflags = TNDB_R_MODE_R;
     db->hdr = hdr;
@@ -612,7 +609,7 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
     if (klen)
         *klen = db_klen;
 
-    DBGF("\nget %d of %d\n", it->_nrec, it->_db->hdr.nrec);
+    DBGF("get %d of %d\n", it->_nrec, it->_db->hdr.nrec);
     if (key) {
         if (n_stream_read(st, key, db_klen) != db_klen)
             return 0;
