@@ -196,29 +196,33 @@ int read_eq(const struct tndb *db, const uint32_t offs,
 static int htt_read(struct tndb *db)
 {
     int i, j;
+    off_t ht_offsets[TNDB_HTSIZE];
 
-    for (i=0; i < TNDB_HTSIZE; i++)
-        db->htt[i] = NULL;
+    /* read ht entries offsets first to avoid backward file seek */
 
     for (i=0; i < TNDB_HTSIZE; i++) {
-        tn_array *ht = db->htt[i];
-        uint32_t ht_offs, ht_size, offs;
-
+        uint32_t ht_offs, offs;
 
         db->htt[i] = NULL;
+        ht_offsets[i] = 0;
 
         offs = db->offs.htt + (sizeof(uint32_t) * i);
-
+        DBGF("h[%d] %d\n", i, offs);
         if (!nn_stream_read_uint32_offs(db->st, &ht_offs, offs))
             return 0;
 
-        if (ht_offs == 0) {
-            //DBGF("empty %d\n", i);
+        ht_offsets[i] = ht_offs;
+    }
+
+    for (i=0; i < TNDB_HTSIZE; i++) {
+        tn_array *ht = db->htt[i];
+        uint32_t ht_size;
+        uint32_t ht_offs = ht_offsets[i];
+
+        if (ht_offs == 0)
             continue;
-        }
 
         DBGF("r[%d] %d\n", i, ht_offs);
-
         if (!nn_stream_read_uint32_offs(db->st, &ht_size, ht_offs))
             return 0;
 
@@ -252,6 +256,7 @@ static int htt_read(struct tndb *db)
         }
     }
 
+    DBGF("htt_read DONE\n");
     return 1;
 }
 

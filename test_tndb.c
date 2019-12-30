@@ -68,7 +68,7 @@ int test_creat(const char *name, int items)
 
     if ((db = tndb_creat(name, -1, TNDB_SIGN_DIGEST)) == NULL) {
         perror("tndb_creat");
-        return -1;
+        n_die("%s: tndb_creat failed", name);
     }
 
     for (i = 0; i < items; i++) {
@@ -81,6 +81,7 @@ int test_creat(const char *name, int items)
 
         if (!tndb_put(db, key, kn, val, vn)) {
             perror("tndb_add");
+            n_die("%s: tndb_add failed", name);
             return -1;
         }
         //if (i % (items / 5) == 0) {
@@ -90,8 +91,10 @@ int test_creat(const char *name, int items)
     }
     printf("%d (%d KB)\n", i, data_size/1024);
 
-    if (!tndb_close(db))
+    if (!tndb_close(db)) {
         perror("tndb_close");
+        n_die("tndb_close %s failed", name);
+    }
 
     return 0;
 }
@@ -111,20 +114,21 @@ int test_walk(const char *name, int items, int with_keys)
         keyp = key;
 
     if ((db = tndb_open(name)) == NULL) {
-        printf("%s\n", name);
         perror("Can't open the database");
+        n_die("%s: tndb_open failed", name);
         return -1;
     }
 
     if (!tndb_verify(db)) {
-        printf("%s: database is broken\n", name);
         tndb_close(db);
+        n_die("%s: broken database", name);
         return -1;
     }
 
     if (!tndb_it_start(db, &it)) {
         tndb_close(db);
         perror("tndb_it_start");
+        n_die("%s: tndb_it_start failed", name);
         return -1;
     }
 
@@ -146,6 +150,7 @@ int test_walk(const char *name, int items, int with_keys)
 
         if (rc < 0) {
             perror("tndb_it_get");
+            n_die("%s: tndb_it_get %d failed", name, nrec);
             return -1;
         }
 
@@ -153,26 +158,26 @@ int test_walk(const char *name, int items, int with_keys)
             continue;
 
         if (kn < 3) {
-            printf("tndb_it_get key error (len %d): %m\n", kn);
+            n_die("%s: tndb_it_get key error (len %d): %m", name, kn);
             return -1;
         }
 
         if (sscanf(key + 3, "%d", &i) != 1) {
-            printf("tndb_it_get key error '%s'\n", key);
+            n_die("%s: tndb_it_get key error '%s'\n", name, key);
             return -1;
         }
 
-
-
+        //printf("key %s %lld\n", key, voffs);
         if (tndb_read(db, voffs, buf, vlen) != (int)vlen) {
             perror("Error while reading data\n");
+            n_die("%s: tndb_read at %lld failed", name, voffs);
             return -1;
         }
         buf[vlen] = '\0';
 
         formatted_value(val, sizeof(val), i);
         if (strcmp(val, buf) != 0) {
-            printf("Wrong data %s %s!\n", val, buf);
+            n_die("%s: wrong data '%s' != '%s'!", name, val, buf);
             return -1;
         }
     }
@@ -192,6 +197,7 @@ int test_lookup(const char *name, int items)
 
     if ((db = tndb_open(name)) == NULL) {
         perror("Can't open the database");
+        n_die("%s: tndb_open failed", name);
         return -1;
     }
 
@@ -211,35 +217,36 @@ int test_lookup(const char *name, int items)
         formatted_value(val, sizeof(val), i);
 
         if ((rc = tndb_get_voff(db, key, kn, &voffs, &vlen)) < 0) {
-            printf("Error while reading key %s (%d): %m\n", key, rc);
+            n_die("%s: error while reading key %s (%d): %m", name, key, rc);
             return -1;
 
 
         } else if (rc == 0) {
             if (i < items) {
-                printf("Key [%s] not found (%d)\n", key, rc);
+                n_die("%s: key [%s] not found (rc=%d)", name, key, rc);
                 return -1;
             }
 
 
         } else {
             char buf[1024 * 32];
-            //printf("found %s %d %d -> ", str, retpos, retlen);
+            //printf("found %s at %lld\n", key, voffs);
 
             if (i >= items) {
-                printf("Ghost record '%s' detected!\n", key);
+                n_die("%s: 'ghost' record ('%s') detected!", name, key);
                 return -1;
             }
 
             if (tndb_read(db, voffs, buf, vlen) != (int)vlen) {
                 perror("Error while reading data\n");
+                n_die("%s: tndb_read at %lld failed", name, voffs);
                 return -1;
             }
             buf[vlen] = '\0';
             //printf(" %s\n", buf);
 
             if (strcmp(val, buf) != 0) {
-                printf("Wrong data %s %s!\n", val, buf);
+                n_die("%s: wrong data '%s' != '%s'!", name, val, buf);
                 return -1;
             }
         }
@@ -262,7 +269,7 @@ int test_filedb(const char *name)
     fflush(stdout);
 
     if ((db = tndb_creat(name, -1, 0)) == NULL) {
-        perror("tndb_creat");
+        n_die("%s: tndb_creat failed", name);
         return -1;
     }
 
@@ -275,6 +282,7 @@ int test_filedb(const char *name)
 
         if (!tndb_put(db, key, kn, val, vn)) {
             perror("tndb_add");
+            n_die("%s: tndb_add failed", name);
             return -1;
         }
         i++;
@@ -285,15 +293,17 @@ int test_filedb(const char *name)
     }
     printf("%d\n", i);
 
-    if (!tndb_close(db))
+    if (!tndb_close(db)) {
+        n_die("%s: tndb_close failed", name);
         perror("tndb_close");
+    }
 
     return 0;
 }
 
 int main(void)
 {
-    int i, n = 1000;
+    int i, n = 10000;
     void *tt;
     char path[1024];
     char *exts[] = { "gz", "zst", 0 };
@@ -307,7 +317,7 @@ int main(void)
         timethis_end(tt, "creat", exts[i]);
 
         tt = timethis_begin();
-        test_walk(path, n, 0);
+        test_walk(path, n, 1);
         timethis_end(tt, "walk", exts[i]);
 
         tt = timethis_begin();
