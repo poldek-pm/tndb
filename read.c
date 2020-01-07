@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <utime.h>
 #include <fcntl.h>
 
 #include <openssl/evp.h>
@@ -51,16 +52,17 @@ static inline int verify_db(struct tndb *db)
 static
 int md5(FILE *stream, unsigned char *md, unsigned *md_size)
 {
-    unsigned char buf[8*1024];
+    unsigned char buf[1024 * 2000];
     EVP_MD_CTX *ctx;
     unsigned n, nn = 0;
-
 
     n_assert(md_size && *md_size);
 
     ctx = EVP_MD_CTX_create();
-    if (!EVP_DigestInit(ctx, EVP_md5()))
+    if (!EVP_DigestInit(ctx, EVP_md5())) {
+        EVP_MD_CTX_destroy(ctx);
         return 0;
+    }
 
     while ((n = fread(buf, 1, sizeof(buf), stream)) > 0) {
         EVP_DigestUpdate(ctx, buf, n);
@@ -105,39 +107,53 @@ int md5hex(FILE *stream, unsigned char *mdhex, unsigned *mdhex_size)
     return *mdhex_size;
 }
 
+static
+time_t util_mtime(const char *path)
+{
+    struct stat st;
+
+    if (stat(path, &st) != 0)
+        return 0;
+
+    return st.st_mtime;
+}
 
 #define DIGEST_SIZE_MD5  32
 
 static
-int make_md5(const char *pathname)
+int make_md5(const char *dbpath)
 {
     FILE            *stream;
     unsigned char   md[128];
     char            path[PATH_MAX];
     unsigned        md_size = sizeof(md);
 
-    if ((stream = fopen(pathname, "r")) == NULL)
+    if ((stream = fopen(dbpath, "r")) == NULL)
         return 0;
 
-    snprintf(path, sizeof(path), "%s.md5", pathname);
+    snprintf(path, sizeof(path), "%s.md5", dbpath);
 
     md5hex(stream, md, &md_size);
     fclose(stream);
 
     if (md_size == DIGEST_SIZE_MD5) {
+        struct utimbuf ut;
         FILE *f;
 
         if ((f = fopen(path, "w")) == NULL)
             return 0;
         fprintf(f, "%s", md);
         fclose(f);
+
+        ut.actime = ut.modtime = util_mtime(dbpath);
+        utime(path, &ut);
     }
 
     return md_size;
 }
 
-
-int verify_md5(const char *pathname)
+static
+int verify_md5(const char *dbpath)
 {
     FILE            *stream;
     unsigned char   md1[DIGEST_SIZE_MD5 + 1], md2[DIGEST_SIZE_MD5 + 1];
@@ -145,33 +161,47 @@ int verify_md5(const char *pathname)
     char            path[PATH_MAX];
     int             fd;
 
-    snprintf(path, sizeof(path), "%s.md5", pathname);
+    snprintf(path, sizeof(path), "%s.md5", dbpath);
+
+    /* check mtimes first */
+    time_t db_mtime = util_mtime(dbpath);
+    if (db_mtime > 0 && db_mtime == util_mtime(path))
+        return 1;
+
     if ((fd = open(path, O_RDONLY)) < 0)
         return 0;
 
     md2_size = read(fd, md2, sizeof(md2));
     close(fd);
 
-    if ((stream = fopen(pathname, "r")) == NULL)
-        return 0;
-
     if (md2_size != DIGEST_SIZE_MD5)
         return 0;
 
+    if ((stream = fopen(dbpath, "r")) == NULL)
+        return 0;
 
     md1_size = sizeof(md1);
     md5hex(stream, md1, &md1_size);
     fclose(stream);
 
+#if ENABLE_TRACE
     DBGF("md5 =\n %s\n %s\n => %d\n",
          (char*)tndb_debug_bin2hex_s(md1, md1_size),
          (char*)tndb_debug_bin2hex_s(md2, md2_size),
          memcmp(md1, md2, md1_size));
+#endif
 
-    return (md1_size == DIGEST_SIZE_MD5 && md1_size == md2_size &&
-            memcmp(md1, md2, DIGEST_SIZE_MD5) == 0);
+    int ok = (md1_size == DIGEST_SIZE_MD5 && md1_size == md2_size &&
+              memcmp(md1, md2, DIGEST_SIZE_MD5) == 0);
+
+    if (ok) {
+        struct utimbuf ut;
+        ut.actime = ut.modtime = db_mtime;
+        utime(path, &ut);
+    }
+
+    return ok;
 }
-
 
 static
 int read_eq(const struct tndb *db, const uint32_t offs,
@@ -191,7 +221,6 @@ int read_eq(const struct tndb *db, const uint32_t offs,
 
     return memcmp(buf, str, len) == 0;
 }
-
 
 static int htt_read(struct tndb *db)
 {
@@ -334,10 +363,13 @@ struct tndb *do_tndb_open(int fd, const char *path)
         return NULL;
     }
 
+#if 0                           /* disable => allow to load empty databases */
+    DBGF("hdr restored %d\n", hdr.nrec);
     if (hdr.nrec <= 0) {
         n_stream_close(st);
         return NULL;
     }
+#endif
 
     db = tndb_new(0);
     db->offs.htt = n_stream_tell(st); /* just after the hdr */
@@ -538,7 +570,6 @@ int tndb_get_str(struct tndb *db, const char *key,
     return nread;
 }
 
-
 tn_array *tndb_keys(struct tndb *db)
 {
     struct tndb_it  it;
@@ -568,7 +599,6 @@ tn_array *tndb_keys(struct tndb *db)
     return keys;
 }
 
-
 int tndb_it_start(struct tndb *db, struct tndb_it *it)
 {
     n_assert(db->rtflags & TNDB_R_MODE_R);
@@ -580,7 +610,7 @@ int tndb_it_start(struct tndb *db, struct tndb_it *it)
     it->st = db->st;
     it->_nrec = 0;
     it->_off = db->hdr.doffs;
-
+    DBGF("data offset %d\n", db->hdr.doffs);
     it->_get_flag = 0;
 
     return 1;
@@ -687,8 +717,6 @@ int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
     return rc;
 }
 
-
-
 int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,
                       unsigned int *avlen)
 {
@@ -708,7 +736,6 @@ int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,
     //printf("tndb_it_get_begin %lu + %lu => %lu\n", voff, vlen, it->_off);
     return 1;
 }
-
 
 int tndb_it_get_end(struct tndb_it *it)
 {
@@ -730,7 +757,6 @@ int tndb_it_get_end(struct tndb_it *it)
 
     return 1;
 }
-
 
 int tndb_read(struct tndb *db, long offs, void *buf, unsigned int size)
 {
