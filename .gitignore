@@ -25,6 +25,7 @@ libtool
 *.o
 .libs
 *.la
+*~
 autom4te.cache
 stamp-h1
 test_tndb
@@ -34,3 +35,7 @@ config.sub
 depcomp
 libtndb.a
 *.pc
+compile
+test-driver
+tests/*.log
+tests/*.trs
