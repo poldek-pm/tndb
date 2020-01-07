@@ -225,7 +225,7 @@ int read_eq(const struct tndb *db, const uint32_t offs,
 static int htt_read(struct tndb *db)
 {
     int i, j;
-    off_t ht_offsets[TNDB_HTSIZE];
+    uint32_t ht_offsets[TNDB_HTSIZE];
 
     /* read ht entries offsets first to avoid backward file seek */
 
@@ -441,7 +441,7 @@ tn_stream *tndb_tn_stream(const struct tndb *db)
 }
 
 int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
-                  off_t *voffs, unsigned int *vlen)
+                  uint32_t *voffs, unsigned int *vlen)
 {
     uint32_t                 hv, hv_i;
     tn_array                 *ht;
@@ -464,7 +464,7 @@ int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
         db->rtflags |= TNDB_R_HTT_LOADED;
     }
 
-    *voffs = (off_t) -1;
+    *voffs = 0;
     *vlen = 0;
 
     if (aklen > UINT8_MAX)
@@ -525,7 +525,7 @@ int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
 int tndb_get(struct tndb *db, const void *key, unsigned int klen,
              void *val, unsigned int valsize)
 {
-    off_t        voffs;
+    uint32_t     voffs;
     unsigned int vlen;
     int          nread = 0;
 
@@ -541,7 +541,7 @@ int tndb_get(struct tndb *db, const void *key, unsigned int klen,
 size_t tndb_get_all(struct tndb *db, const void *key, size_t klen,
 		    void **val)
 {
-    off_t  voffs;
+    uint32_t voffs;
     size_t nread = 0;
     unsigned int vlen;
 
@@ -576,7 +576,7 @@ tn_array *tndb_keys(struct tndb *db)
     char            key[TNDB_KEY_MAX + 1];
     unsigned        klen, vlen;
     tn_array        *keys;
-    off_t           voffs;
+    uint32_t        voffs;
     int             rc;
 
 
@@ -622,7 +622,7 @@ int tndb_it_start(struct tndb *db, struct tndb_it *it)
   if key is NULL then keys are not retrieved
  */
 int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
-                     off_t *voff, unsigned int *vlen)
+                     uint32_t *voff, unsigned int *vlen)
 {
     uint8_t db_klen = 0;
     uint32_t vlen32 = 0;
@@ -672,7 +672,7 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
 int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
                 void *val, unsigned int *avlen)
 {
-    off_t        voff;
+    uint32_t     voff;
     unsigned int vlen;
     int          rc = 0;
 
@@ -695,7 +695,7 @@ int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
 int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
                  void **val, unsigned int *avlen)
 {
-    off_t        voff;
+    uint32_t     voff;
     unsigned int vlen;
     int          rc = 0;
 
@@ -720,7 +720,7 @@ int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
 int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,
                       unsigned int *avlen)
 {
-    off_t        voff = 0;
+    uint32_t     voff = 0;
     unsigned int vlen = 0;
 
     n_assert(it->_get_flag == 0);
@@ -739,17 +739,15 @@ int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,
 
 int tndb_it_get_end(struct tndb_it *it)
 {
-    off_t    off = 0;
+    uint32_t off = n_stream_tell(it->_db->st);
 
-    off = n_stream_tell(it->_db->st);
-
-    if (off > (int)it->_off) {
+    if (off > it->_off) {
         n_die("tndb_it_get_end: current offset is %lu, expected %u\n", off,
                it->_off);
         return 0;
     }
 
-    if (off < (int)it->_off)
+    if (off < it->_off)
         n_stream_seek(it->_db->st, it->_off, SEEK_SET);
 
     n_assert(it->_get_flag > 0);

@@ -16,7 +16,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>          /* for off_t */
 
 #define TNDB_KEY_MAX 255
 
@@ -74,7 +73,7 @@ EXPORT int tndb_get_str(struct tndb *db, const char *key,
 			unsigned char *val, unsigned int valsize);
 
 EXPORT int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
-			 off_t *voffs, unsigned int *vlen);
+			 uint32_t *voffs, unsigned int *vlen);
 
 EXPORT int tndb_read(struct tndb *db, long offs, void *buf, unsigned int size);
 
@@ -95,7 +94,7 @@ EXPORT int tndb_it_start(struct tndb *db, struct tndb_it *it);
 
 /*
   key size must be at least TNDB_KEY_MAX + 1 bytes
-  if key is NULL then keys are not retrieved 
+  if key is NULL then keys are not retrieved
  */
 EXPORT int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
 		       void *val, unsigned int *vlen);
@@ -105,7 +104,7 @@ EXPORT int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
 	                void **val, unsigned int *vlen);
 
 EXPORT int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
-                	    off_t *voff, unsigned int *vlen);
+                	    uint32_t *voff, unsigned int *vlen);
 
 /* for reading directly from db's stream */
 EXPORT int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,

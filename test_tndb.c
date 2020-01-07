@@ -53,7 +53,7 @@ int formatted_key(char *val, int vsize, int v)
 int formatted_value(char *val, int vsize, int v)
 {
     char *fmt = "val%%.%dd", valfmt[256];
-    snprintf(valfmt, sizeof(valfmt), fmt, v * 100);
+    snprintf(valfmt, sizeof(valfmt), fmt, v * 2);
     memset(val, 0, vsize);
     return n_snprintf(val, vsize, valfmt, v);
 }
@@ -96,13 +96,16 @@ int test_creat(const char *name, int items)
         n_die("tndb_close %s failed", name);
     }
 
+    db = tndb_open(name);
+    n_assert(db != NULL);
+
     return 0;
 }
 
 int test_walk(const char *name, int items, int with_keys)
 {
     uint32_t vlen;
-    off_t voffs;
+    uint32_t voffs;
     struct tndb *db;
     struct tndb_it it;
     char key[TNDB_KEY_MAX + 1], val[1024 * 32];
@@ -192,7 +195,7 @@ int test_lookup(const char *name, int items)
 {
     int i;
     uint32_t vlen;
-    off_t voffs;
+    uint32_t voffs;
     struct tndb *db;
 
     if ((db = tndb_open(name)) == NULL) {
@@ -303,27 +306,30 @@ int test_filedb(const char *name)
 
 int main(void)
 {
-    int i, n = 10000;
-    void *tt;
-    char path[1024];
     char *exts[] = { "gz", "zst", 0 };
+    int ns[] = { 0, 10000, -1 };
+    char path[1024];
 
-    i = 0;
-    while (exts[i]) {
-        n_snprintf(path, sizeof(path), "/tmp/test-tndb.%s", exts[i]);
+    int ni = 0;
+    while (ns[ni] >= 0) {
+        int n = ns[ni++];
+        int i = 0;
 
-        tt = timethis_begin();
-        test_creat(path, n);
-        timethis_end(tt, "creat", exts[i]);
+        while (exts[i]) {
+            const char *ext = exts[i++];
+            n_snprintf(path, sizeof(path), "/tmp/test-tndb.%s", ext);
 
-        tt = timethis_begin();
-        test_walk(path, n, 1);
-        timethis_end(tt, "walk", exts[i]);
+            void *tt = timethis_begin();
+            test_creat(path, n);
+            timethis_end(tt, "creat", ext);
 
-        tt = timethis_begin();
-        test_lookup(path, n);
-        timethis_end(tt, "lookup", exts[i]);
+            tt = timethis_begin();
+            test_walk(path, n, 1);
+            timethis_end(tt, "walk", ext);
 
-        i++;
+            tt = timethis_begin();
+            test_lookup(path, n);
+            timethis_end(tt, "lookup", ext);
+        }
     }
 }
