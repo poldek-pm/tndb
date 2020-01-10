@@ -98,6 +98,7 @@ int test_creat(const char *name, int items)
 
     db = tndb_open(name);
     n_assert(db != NULL);
+    tndb_close(db);
 
     return 0;
 }
@@ -256,6 +257,7 @@ int test_lookup(const char *name, int items)
     }
 
     printf("%d\n", i);
+    tndb_close(db);
     return 0;
 }
 
