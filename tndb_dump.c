@@ -99,7 +99,7 @@ int do_walk(const char *name, unsigned flags)
 int main(int argc, char *argv[])
 {
     if (argc > 1)
-        do_walk(argv[1], 0);
+        do_walk(argv[1], DUMP_DATA);
 
     return 0;
 }

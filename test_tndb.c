@@ -306,6 +306,29 @@ int test_filedb(const char *name)
     return 0;
 }
 
+int test_keys(const char *path)
+{
+    struct tndb *db;
+
+    if ((db = tndb_open(path)) == NULL) {
+        perror("Can't open the database");
+        n_die("%s: tndb_open failed", path);
+        return -1;
+    }
+
+    tn_array *keys = tndb_keys(db);
+    printf("loaded %d keys\n", n_array_size(keys));
+
+    tndb_close(db);
+    n_array_free(keys);
+    return 0;
+}
+
+int xmain(void) {
+    test_keys("/tmp/packages.ndir.zst");
+    return 0;
+}
+
 int main(void)
 {
     char *exts[] = { "gz", "zst", 0 };
@@ -334,4 +357,6 @@ int main(void)
             timethis_end(tt, "lookup", ext);
         }
     }
+
+    return 0;
 }
