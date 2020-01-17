@@ -763,3 +763,7 @@ int tndb_read(struct tndb *db, long offs, void *buf, unsigned int size)
 
     return n_stream_read(db->st, buf, size);
 }
+
+uint32_t tndb_size(const struct tndb *db) {
+    return db->hdr.nrec;
+}

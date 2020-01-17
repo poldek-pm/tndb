@@ -114,4 +114,7 @@ EXPORT int tndb_it_get_end(struct tndb_it *it);
 
 EXPORT tn_array *tndb_keys(struct tndb *db);
 
+/* number of records */
+EXPORT uint32_t tndb_size(const struct tndb *db);
+
 #endif
