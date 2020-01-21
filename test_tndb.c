@@ -307,7 +307,7 @@ int test_filedb(const char *name)
     return 0;
 }
 
-int test_keys(const char *path)
+int test_keys(const char *path, int items)
 {
     struct tndb *db;
 
@@ -317,8 +317,12 @@ int test_keys(const char *path)
         return -1;
     }
 
+
     tn_array *keys = tndb_keys(db);
-    printf("loaded %d keys\n", n_array_size(keys));
+    n_assert(keys);
+    if (n_array_size(keys) != items) {
+        n_die("loaded %d keys, %d expected\n", n_array_size(keys), items);
+    }
 
     tndb_close(db);
     n_array_free(keys);
@@ -352,6 +356,10 @@ int main(void)
             tt = timethis_begin();
             test_lookup(path, n);
             timethis_end(tt, "lookup", ext);
+
+            tt = timethis_begin();
+            test_keys(path, n);
+            timethis_end(tt, "keys", ext);
         }
     }
 
