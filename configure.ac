@@ -96,7 +96,6 @@ AC_CONFIG_FILES([
 Makefile
 data/Makefile
 data/tndb.pc
-tests/Makefile
 ])
 AC_OUTPUT
 

@@ -37,5 +37,5 @@ libtndb.a
 *.pc
 compile
 test-driver
-tests/*.log
-tests/*.trs
+*.log
+*.trs

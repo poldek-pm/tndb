@@ -14,6 +14,7 @@
 #include <sys/time.h>
 #include <trurl/nmalloc.h>
 #include <trurl/n_snprintf.h>
+#include <trurl/n_check.h>
 
 #include "compiler.h"
 #include "tndb.h"
@@ -324,16 +325,11 @@ int test_keys(const char *path)
     return 0;
 }
 
-int xmain(void) {
-    test_keys("/tmp/packages.ndir.zst");
-    return 0;
-}
-
 int main(void)
 {
     char *exts[] = { "gz", "zst", 0 };
     int ns[] = { 0, 10000, -1 };
-    char path[1024];
+    char filename[1024];
 
     int ni = 0;
     while (ns[ni] >= 0) {
@@ -342,7 +338,8 @@ int main(void)
 
         while (exts[i]) {
             const char *ext = exts[i++];
-            n_snprintf(path, sizeof(path), "/tmp/test-tndb.%s", ext);
+            n_snprintf(filename, sizeof(filename), "tndb.%s", ext);
+            const char *path = NTEST_TMPPATH(filename);
 
             void *tt = timethis_begin();
             test_creat(path, n);

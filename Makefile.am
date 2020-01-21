@@ -3,7 +3,7 @@ NULL =
 AM_CFLAGS = @AM_CFLAGS@
 
 SUBDIRS = data
-DIST_SUBDIRS = $(SUBDIRS) tests
+DIST_SUBDIRS = $(SUBDIRS)
 
 lib_LTLIBRARIES =						\
 	libtndb.la						\
@@ -25,6 +25,8 @@ libtndb_includedir = $(includedir)/tndb
 libtndb_include_HEADERS =					\
 	tndb.h							\
 	$(NULL)
+
+TESTS = test_tndb
 
 
 noinst_PROGRAMS =						\
@@ -59,7 +61,7 @@ MAINTAINERCLEANFILES =						\
 	`find "$(srcdir)" -type f -name Makefile.in -print`
 
 DISTCLEANFILES = TAGS gmon.out $(distdir)/.deps libtndb.a tndb-*.tar.*
-CLEANFILES = $(EXTRA_PROGRAMS) core *.o *.bak *~ *% *\# \#* 
+CLEANFILES = $(EXTRA_PROGRAMS) core *.o *.bak *~ *% *\# \#*
 
 all-local:
 	@ln -sf .libs/libtndb.a libtndb.a
