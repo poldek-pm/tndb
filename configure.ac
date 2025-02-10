@@ -55,7 +55,6 @@ if test -n "$GCC"; then
 fi
 
 # Checks for header files.
-AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h sys/param.h sys/time.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
