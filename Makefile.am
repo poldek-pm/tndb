@@ -26,11 +26,12 @@ libtndb_include_HEADERS =					\
 	tndb.h							\
 	$(NULL)
 
-TESTS = test_tndb
+TESTS = test_tndb test_compr
 
 
 noinst_PROGRAMS =						\
 	test_tndb						\
+	test_compr						\
 	tndb_dump						\
 	$(NULL)
 
@@ -38,9 +39,14 @@ test_tndb_LDADD =						\
 	libtndb.la						\
 	$(NULL)
 
+test_compr_LDADD =						\
+	libtndb.la						\
+	$(NULL)
+
 tndb_dump_LDADD =						\
 	libtndb.la						\
 	$(NULL)
+
 
 MAINTAINERCLEANFILES =						\
 	aclocal.m4						\

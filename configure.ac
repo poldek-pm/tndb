@@ -72,7 +72,6 @@ AC_CHECK_FUNCS([gettimeofday memset mkstemp rmdir])
 
 # Checks for libraries.
 AC_CHECK_LIB(crypto, EVP_DigestInit, [], [AC_MSG_ERROR(["libcrypto is needed by $PACKAGE"])])
-AC_CHECK_LIB(z, gzopen)
 
 # Use local ../trurlib copy if it exists
 AC_MSG_CHECKING([for local trurlib copy in ../trurlib])
@@ -87,7 +86,9 @@ else
 			[],
 			[AC_MSG_ERROR([trurl.h is missing])])
 	AC_CHECK_LIB(trurl, n_cfree)
+        AC_CHECK_FUNCS(n_stream_guess_type)
 fi
+
 
 PKG_CHECK_MODULES(CHECK, check >= 0.9.4, have_check=yes, have_check=no)
 

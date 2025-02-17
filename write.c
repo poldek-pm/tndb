@@ -29,6 +29,7 @@
 #include <trurl/nassert.h>
 
 #define ENABLE_TRACE 0
+#define TN_STREAM_USE_GZIO_NG 1
 #include "compiler.h"
 #include "tndb_int.h"
 #include "tndb.h"
@@ -53,7 +54,7 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
     char                path[PATH_MAX], mode[32] = "wb";
     tn_stream           *st;
     struct tndb         *db = NULL;
-    int                 fd, n, type = TN_STREAM_STDIO;
+    int                 fd, type = TN_STREAM_STDIO;
 
     snprintf(path, sizeof(path), "%s.tmpXXXXXX", name);
 
@@ -70,15 +71,8 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
     rmdir(path);
     unlink(path); /* unlink just after create, it's temporary file */
 
-    n = strlen(name);
-    if (n > 3 && strcmp(&name[n - 3], ".gz") == 0) {
-        type = TN_STREAM_GZIO;
-        if (comprlevel >= 0 && comprlevel < 10)
-            snprintf(mode, sizeof(mode), "wb%d", comprlevel);
-    }
-
-    if (n > 4 && strcmp(&name[n - 4], ".zst") == 0) {
-        type = TN_STREAM_ZSTDIO;
+    type = tndb_detect_stream_type(name);
+    if (type == TN_STREAM_GZIO || type ==  TN_STREAM_ZSTDIO || type == TN_STREAM_GZIO_NG) {
         if (comprlevel >= 0 && comprlevel < 10)
             snprintf(mode, sizeof(mode), "wb%d", comprlevel);
     }
@@ -89,8 +83,7 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
     db = tndb_new(flags);
     db->rtflags |= TNDB_R_MODE_W;
     db->st = st;
-    db->path = n_strdupl(path, n);
-
+    db->path = n_strdupl(name, strlen(name));
     if (db->hdr.flags & TNDB_SIGN_DIGEST)
         n_stream_set_write_hook(st, st_write_hook_write, &db->hdr.sign);
 

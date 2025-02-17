@@ -503,15 +503,5 @@ const char *tndb_path(const struct tndb *db)
 
 int tndb_detect_stream_type(const char *path)
 {
-    int type = TN_STREAM_STDIO;
-    int n = strlen(path);
-
-    if (n > 3 && strcmp(&path[n - 3], ".gz") == 0) {
-        type = TN_STREAM_GZIO;
-
-    } else if (n > 4 && strcmp(&path[n - 4], ".zst") == 0) {
-        type = TN_STREAM_ZSTDIO;
-    }
-
-    return type;
+    return n_stream_guess_type(path);
 }

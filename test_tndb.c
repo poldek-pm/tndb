@@ -329,10 +329,12 @@ int test_keys(const char *path, int items)
     return 0;
 }
 
+extern const char *trurl_default_libz(void);
 int main(void)
 {
-    char *exts[] = { "gz", "zst", 0 };
-    int ns[] = { 0, 10000, -1 };
+    char *exts[] = { "none", "gz", "zst", 0 };
+
+    int ns[] = { 0, 1000, 10000, -1 };
     char filename[1024];
 
     int ni = 0;

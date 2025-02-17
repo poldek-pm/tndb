@@ -39,3 +39,5 @@ compile
 test-driver
 *.log
 *.trs
+core.[0-9]*
+callgrind.out.*
