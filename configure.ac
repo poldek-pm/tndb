@@ -99,13 +99,13 @@ data/tndb.pc
 ])
 AC_OUTPUT
 
-echo "
-		    tndb $VERSION
-		  ============
-
-	prefix:         ${prefix}
-	compiler:       ${CC}
-	cflags:         ${CFLAGS}
-	cppflags:       ${CPPFLAGS}
-	ldflags:        ${LDFLAGS}
-"
+#echo "
+#		    tndb $VERSION
+#		  ============
+#
+#	prefix:         ${prefix}
+#	compiler:       ${CC}
+#	cflags:         ${CFLAGS}
+#	cppflags:       ${CPPFLAGS}
+#	ldflags:        ${LDFLAGS}
+#"
