@@ -10,7 +10,7 @@
 # if defined(FILENAME_MAX)
 #  define PATH_MAX FILENAME_MAX
 # elif defined(_POSIX_PATH_MAX)
-#  defined PATH_MAX _POSIX_PATH_MAX
+#  define PATH_MAX _POSIX_PATH_MAX
 # endif
 #endif
 
