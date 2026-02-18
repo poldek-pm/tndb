@@ -68,7 +68,6 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
 
     fchmod(fd, 0600);
 
-    rmdir(path);
     unlink(path); /* unlink just after create, it's temporary file */
 
     type = tndb_detect_stream_type(name);
