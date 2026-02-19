@@ -91,11 +91,13 @@ fi
 
 
 PKG_CHECK_MODULES(CHECK, check >= 0.9.4, have_check=yes, have_check=no)
+AM_CONDITIONAL(HAVE_CHECK, test x"$have_check" = x"yes")
 
 AC_CONFIG_FILES([
 Makefile
 data/Makefile
 data/tndb.pc
+tests/Makefile
 ])
 AC_OUTPUT
 

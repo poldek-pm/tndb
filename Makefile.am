@@ -2,7 +2,7 @@ NULL =
 
 AM_CFLAGS = @AM_CFLAGS@
 
-SUBDIRS = data
+SUBDIRS = data tests
 DIST_SUBDIRS = $(SUBDIRS)
 
 lib_LTLIBRARIES =						\
@@ -26,21 +26,8 @@ libtndb_include_HEADERS =					\
 	tndb.h							\
 	$(NULL)
 
-TESTS = test_tndb test_compr
-
-
 noinst_PROGRAMS =						\
-	test_tndb						\
-	test_compr						\
 	tndb_dump						\
-	$(NULL)
-
-test_tndb_LDADD =						\
-	libtndb.la						\
-	$(NULL)
-
-test_compr_LDADD =						\
-	libtndb.la						\
 	$(NULL)
 
 tndb_dump_LDADD =						\

@@ -41,3 +41,5 @@ test-driver
 *.trs
 core.[0-9]*
 callgrind.out.*
+test_*
+!test_*.c
