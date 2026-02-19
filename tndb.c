@@ -139,11 +139,6 @@ int tndb_sign_store_sizeof(struct tndb_sign *sign, uint32_t flags)
     if (flags & TNDB_SIGN_DIGEST)
         size += sizeof(uint8_t) + strlen("md") +
             sizeof(uint16_t) + sizeof(sign->md);
-#define DUMMY_TEST_SIGN 0
-#if DUMMY_TEST_SIGN
-    size += sizeof(uint8_t) + strlen("dupa") +
-            sizeof(uint16_t) + (2 * sizeof(sign->md));
-#endif
     return size;
 }
 
@@ -226,16 +221,7 @@ int tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags)
             return 0;
         stsize += n;
     }
-#if DUMMY_TEST_SIGN
-    {
-        char buf[1024] = "ala ma kota xxxxxxxxxxxxxxxxxxxt";
-        int n;
 
-        if ((n = store_sig(st, "dupa", buf, 2 * sizeof(sign->md))) == 0)
-            return 0;
-        stsize += n;
-    }
-#endif
     n_assert((int)sizeof(uint16_t) + stsize == size);
     return 1;
 }
