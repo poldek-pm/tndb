@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2002 Pawel A. Gajda <mis@k2.net.pl>
+  Copyright (C) 2002-2026 Pawel A. Gajda <mis@pld-linux.org>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU Library General Public License, version 2
