@@ -177,6 +177,49 @@ START_TEST(test_signed_database)
 }
 END_TEST
 
+START_TEST(test_corrupted_database)
+{
+    struct tndb *db;
+    char *key = "signed_key";
+    char *val = "signed_value";
+    char *path = NTEST_TMPPATH("tndb_corrupted.db");
+    FILE *fp;
+    long filesize;
+
+    unlink(path);
+
+    /* Create signed database */
+    db = tndb_creat(path, -1, TNDB_SIGN_DIGEST);
+    expect_notnull(db);
+    expect_int(tndb_put(db, key, strlen(key), val, strlen(val)), 1);
+    expect_int(tndb_close(db), 1);
+
+    /* Corrupt the database file */
+    fp = fopen(path, "r+b");
+    expect_notnull(fp);
+
+    /* Get file size */
+    fseek(fp, 0, SEEK_END);
+    filesize = ftell(fp);
+
+    /* Corrupt a byte in the middle of the file */
+    if (filesize > 100) {
+        fseek(fp, filesize / 2, SEEK_SET);
+        fputc(0xFF, fp);  /* corrupt one byte */
+    }
+    fclose(fp);
+
+    /* Open corrupted database - should succeed */
+    db = tndb_open(path);
+    expect_notnull(db);
+
+    /* Verify should fail for corrupted database */
+    expect_int(tndb_verify(db), 0);
+    expect_int(tndb_close(db), 1);
+    unlink(path);
+}
+END_TEST
+
 START_TEST(test_refcount)
 {
     struct tndb *db;
@@ -263,6 +306,7 @@ NTEST_RUNNER("tndb-basic",
              test_put_get_basic,
              test_multiple_records,
              test_signed_database,
+             test_corrupted_database,
              test_refcount,
              test_path_and_stream,
              test_keys_api
