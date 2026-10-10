@@ -181,7 +181,7 @@ START_TEST(test_iterator_rget)
     char key[32], val[32];
     char iter_key[TNDB_KEY_MAX + 1];
     void *iter_val = NULL;
-    unsigned int klen, vlen;
+    unsigned int klen, vlen = 0;    /* in: size of iter_val */
     struct tndb_it it;
     int i, count = 0;
     int nrec = 50;
