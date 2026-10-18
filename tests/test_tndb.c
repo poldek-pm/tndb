@@ -41,7 +41,8 @@ void timethis_end(void *tvp, const char *prefix, const char *suffix)
         tv.tv_usec = 1000000 + tv.tv_usec;
     }
 
-    printf("time [%s.%s] %ld.%ld\n", prefix, suffix, tv.tv_sec, tv.tv_usec);
+    printf("time [%s.%s] %lld.%ld\n", prefix, suffix, (long long)tv.tv_sec,
+           (long)tv.tv_usec);
     free(tvp);
 }
 
@@ -175,7 +176,7 @@ int test_walk(const char *name, int items, int with_keys)
         //printf("key %s %lld\n", key, voffs);
         if (tndb_read(db, voffs, buf, vlen) != (int)vlen) {
             perror("Error while reading data\n");
-            n_die("%s: tndb_read at %lld failed", name, voffs);
+            n_die("%s: tndb_read at %u failed", name, voffs);
             return -1;
         }
         buf[vlen] = '\0';
@@ -244,7 +245,7 @@ int test_lookup(const char *name, int items)
 
             if (tndb_read(db, voffs, buf, vlen) != (int)vlen) {
                 perror("Error while reading data\n");
-                n_die("%s: tndb_read at %lld failed", name, voffs);
+                n_die("%s: tndb_read at %u failed", name, voffs);
                 return -1;
             }
             buf[vlen] = '\0';

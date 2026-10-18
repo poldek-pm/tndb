@@ -34,7 +34,8 @@ void timethis_end(void *tvp, const char *prefix)
         tv.tv_usec = 1000000 + tv.tv_usec;
     }
 
-    printf("time [%s] %ld.%ld\n", prefix, tv.tv_sec, tv.tv_usec);
+    printf("time [%s] %lld.%ld\n", prefix, (long long)tv.tv_sec,
+           (long)tv.tv_usec);
     free(tvp);
 }
 
