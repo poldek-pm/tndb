@@ -28,7 +28,6 @@
 #include <trurl/narray.h>
 #include <trurl/nassert.h>
 
-#define ENABLE_TRACE 0
 #define TN_STREAM_USE_GZIO_NG 1
 #include "compiler.h"
 #include "tndb_int.h"
