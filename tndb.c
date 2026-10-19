@@ -360,6 +360,8 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
 {
     int nerr = 0, size;
 
+    memset(hdr, 0, sizeof(*hdr));
+
     if (n_stream_seek(st, 0, SEEK_SET) == -1)
         return 0;
 
