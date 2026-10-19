@@ -366,6 +366,16 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
     size = sizeof(hdr->hdr);
     nerr += n_stream_read(st, hdr->hdr, size) != size;
 
+    if (nerr == 0) {            /* "tndb1.0\n": any minor of our major */
+        char magic[12];
+        int n = n_snprintf(magic, sizeof(magic), "tndb%d.", TNDB_FILEFMT_MAJOR);
+
+        if (memcmp(hdr->hdr, magic, n) != 0) {
+            errno = EINVAL;
+            nerr++;
+        }
+    }
+
     if (nerr == 0 && !n_stream_read_uint8(st, &hdr->flags))
         nerr++;
 
