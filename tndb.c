@@ -173,8 +173,9 @@ int store_sig(tn_stream *st, const char *name, void *sig, int size)
     return stsize;
 }
 
+/* *sigsize: the size of sig on entry, of the signature read on return */
 static
-int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int size)
+int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int *sigsize)
 {
     uint16_t ssize;
     uint8_t  nsize;
@@ -183,7 +184,10 @@ int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int
     if (!n_stream_read_uint8(st, &nsize))
         return 0;
 
-    n_assert(namesize > nsize);
+    if (nsize >= namesize) {
+        errno = EINVAL;
+        return 0;
+    }
     if (n_stream_read(st, name, nsize) != nsize)
         return 0;
     name[nsize] = '\0';
@@ -193,9 +197,13 @@ int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int
     if (!n_stream_read_uint16(st, &ssize))
         return 0;
 
-    n_assert(size > ssize);
+    if (ssize >= *sigsize) {
+        errno = EINVAL;
+        return 0;
+    }
     if (n_stream_read(st, sig, ssize) != ssize)
         return 0;
+    *sigsize = ssize;
 
     stsize += sizeof(ssize) + ssize;
     return stsize;
@@ -241,8 +249,9 @@ int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
     size = size16;
 
     while (size > 0) {
+        unsigned int sigsize = sizeof(sig);
         int n;
-        n = restore_sig(st, name, sizeof(name), sig, sizeof(sig));
+        n = restore_sig(st, name, sizeof(name), sig, &sigsize);
         if (n == 0) {
             rc = 0;
             break;
@@ -255,7 +264,11 @@ int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
         }
         DBGF("%s, length=%d\n", name, n);
         if (strcmp(name, "md") == 0) {
-            n_assert (flags & TNDB_SIGN_DIGEST);
+            if ((flags & TNDB_SIGN_DIGEST) == 0 || sigsize != sizeof(sign->md)) {
+                rc = 0;
+                errno = EINVAL;
+                break;
+            }
             if (!memcpy(sign->md, sig, sizeof(sign->md))) {
                 rc = 0;
                 break;
