@@ -275,7 +275,7 @@ static int tndbw_close(struct tndb *db)
     type = db->st->type;
 
     if ((fdin = dup(db->st->fd)) == -1)
-        return 0;
+        goto l_end;
 
     n_stream_close(db->st);
     db->st = NULL;
@@ -285,6 +285,7 @@ static int tndbw_close(struct tndb *db)
 
     if ((db->st = n_stream_dopen(fdout, "wb", type)) == NULL)
         goto l_end;
+    fdout = -1;                 /* closed with db->st */
 
     db->hdr.doffs = tndb_hdr_store_sizeof(&db->hdr) + htt_store_size(db);
     //printf("headers = %d\n", db->hdr.doffs);
@@ -335,10 +336,10 @@ static int tndbw_close(struct tndb *db)
  l_end:
     tndb_free(db);
 
-    if (fdin > 0)
+    if (fdin >= 0)
         close(fdin);
 
-    if (fdout > 0)
+    if (fdout >= 0)
         close(fdout);
 
     return rc;
