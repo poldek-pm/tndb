@@ -318,8 +318,11 @@ int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st)
                 n = to_read;
             to_read -= n;
 
-            if (n_stream_read(st, buf, n) != n)
+            if (n_stream_read(st, buf, n) != n) {
+                tndb_sign_final(&hdr->sign);
+                hdr->sign = sign;
                 return 0;
+            }
 
             tndb_sign_update(&hdr->sign, buf, n);
         }
