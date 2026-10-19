@@ -350,7 +350,7 @@ struct tndb *do_tndb_open(int fd, const char *path)
 
     type = tndb_detect_stream_type(path);
 
-    if (fd > 0)
+    if (fd >= 0)
         st = n_stream_dopen(fd, "rb", type);
     else
         st = n_stream_open(path, "rb", type);
