@@ -357,9 +357,6 @@ int tndb_close(struct tndb *db)
     if (db->rtflags & TNDB_R_MODE_W) {
         if ((db->rtflags & TNDB_R_UNLINKED) == 0)
             return tndbw_close(db);
-
-        else if (db->hdr.flags & TNDB_SIGN_DIGEST)
-            tndb_sign_final(&db->hdr.sign);
     }
 
     tndb_free(db);

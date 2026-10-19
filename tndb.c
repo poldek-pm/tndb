@@ -472,6 +472,9 @@ void tndb_free(struct tndb *db)
         db->st = NULL;
     }
 
+    if (db->hdr.sign.ctx != NULL)    /* left by a write that did not finish */
+        tndb_sign_final(&db->hdr.sign);
+
     if (db->path != NULL) {
         free(db->path);
         db->path = NULL;
