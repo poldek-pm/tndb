@@ -14,6 +14,7 @@
 #include <trurl/n_check.h>
 
 #include "tndb.h"
+#include "tndb_int.h"
 
 static void create_verified(const char *path)
 {
@@ -124,6 +125,53 @@ START_TEST(test_md5_file_of_an_older_tndb)
     expect_int(verify(path), 1);
     expect_int(stat(md5path, &st), 0);
     expect_int(st.st_size > 32, 1);     /* now with the size and mtime */
+    remove_verified(path);
+}
+END_TEST
+
+/* tndb_verify() trusts a .md5 whose key matches without comparing the hash
+   or reading the database.  Corrupting the hash and moving the header's data
+   offset past EOF makes both fallbacks fail; verify_digest() would also leave
+   hdr->sign zeroed (it returns before restoring it), so an unchanged
+   hdr->sign proves it was not called. */
+START_TEST(test_md5_key_match_skips_verification)
+{
+    char *path = NTEST_TMPPATH("tndb_verify_key_match.db");
+    char md5path[PATH_MAX + 4];
+    struct tndb *db;
+    unsigned char sig[sizeof(((struct tndb_hdr *)0)->sign.md)];
+    char line[256];
+    struct stat st;
+    uint32_t doffs;
+    FILE *fp;
+
+    create_verified(path);
+    snprintf(md5path, sizeof(md5path), "%s.md5", path);
+
+    /* leave the key alone: if verify_md5() compared the hash it would fail */
+    fp = fopen(md5path, "r+");
+    expect_notnull(fp);
+    expect_notnull(fgets(line, sizeof(line), fp));
+    line[0] = (line[0] == '0') ? '1' : '0';
+    rewind(fp);
+    expect_int(fputs(line, fp) >= 0, 1);
+    expect_int(fclose(fp), 0);
+
+    db = tndb_open(path);
+    expect_notnull(db);
+    memcpy(sig, db->hdr.sign.md, sizeof(sig));
+
+    /* if verify_digest() is called, the hash table read runs past EOF and
+       returns before hdr->sign is restored */
+    expect_int(stat(path, &st), 0);
+    doffs = db->hdr.doffs;
+    db->hdr.doffs = st.st_size + 4096;
+
+    expect_int(tndb_verify(db), 1);
+    expect_int(memcmp(sig, db->hdr.sign.md, sizeof(sig)), 0);
+
+    db->hdr.doffs = doffs;
+    expect_int(tndb_close(db), 1);
     remove_verified(path);
 }
 END_TEST
@@ -301,6 +349,7 @@ NTEST_RUNNER("tndb-verify",
              test_changed_within_the_same_second,
              test_cut_with_its_mtime_kept,
              test_md5_file_of_an_older_tndb,
+             test_md5_key_match_skips_verification,
              test_make_md5_stat_race,
              test_verify_md5_stat_race
 );
