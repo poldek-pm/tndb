@@ -133,9 +133,37 @@ START_TEST(test_digest_without_md)
 }
 END_TEST
 
+/* Truncated header: the file is not a database, so tndb_open() must
+   report EINVAL, not merely return NULL with whatever errno was left. */
+START_TEST(test_short_header)
+{
+    static const struct { const char *data; size_t n; } cases[] = {
+        { "", 0 },                      /* empty file */
+        { "tndb", 4 },                  /* magic cut short */
+        { "tndb1.0\n", 8 },             /* no flags */
+        { "tndb1.0\n\x01", 9 },         /* no signature block size */
+    };
+    char *path = NTEST_TMPPATH("tndb_open_short_hdr.db");
+    FILE *fp;
+
+    for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        fp = fopen(path, "wb");
+        expect_notnull(fp);
+        expect_int(fwrite(cases[i].data, 1, cases[i].n, fp), cases[i].n);
+        fclose(fp);
+
+        errno = 0;
+        expect_null(tndb_open(path));
+        expect_int(errno, EINVAL);
+    }
+    unlink(path);
+}
+END_TEST
+
 NTEST_RUNNER("tndb-open",
              test_not_a_database,
              test_corrupted_signature_block,
              test_short_signature_block,
-             test_digest_without_md
+             test_digest_without_md,
+             test_short_header
 );

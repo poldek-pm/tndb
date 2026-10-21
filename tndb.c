@@ -420,6 +420,9 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
 
     DBGF("nrec %u, doffs %u, errs %d\n", hdr->nrec, hdr->doffs, nerr);
 
+    if (nerr)
+        errno = EINVAL;
+
     return nerr == 0;
 }
 
