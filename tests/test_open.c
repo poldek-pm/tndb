@@ -28,6 +28,27 @@ START_TEST(test_not_a_database)
 }
 END_TEST
 
+/* The motivating poldek case: a .gz name with HTML (not gzip) inside.
+   gzip streams read non-gzip data transparently, so this must fail like
+   any other non-database. */
+START_TEST(test_not_a_database_gz)
+{
+    const char *html = "<html><head><title>Not Found</title></head></html>\n";
+    char *path = NTEST_TMPPATH("tndb_open_html.gz");
+    FILE *fp;
+
+    fp = fopen(path, "wb");
+    expect_notnull(fp);
+    fputs(html, fp);
+    fclose(fp);
+
+    errno = 0;
+    expect_null(tndb_open(path));
+    expect_int(errno, EINVAL);
+    unlink(path);
+}
+END_TEST
+
 /* signed database: "tndb1.0\n", flags (offset 8), signature block size (9),
    then the "md" record: name length (11), name (12), digest length (14) */
 START_TEST(test_corrupted_signature_block)
@@ -162,6 +183,7 @@ END_TEST
 
 NTEST_RUNNER("tndb-open",
              test_not_a_database,
+             test_not_a_database_gz,
              test_corrupted_signature_block,
              test_short_signature_block,
              test_digest_without_md,
