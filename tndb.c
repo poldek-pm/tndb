@@ -173,8 +173,9 @@ int store_sig(tn_stream *st, const char *name, void *sig, int size)
     return stsize;
 }
 
+/* *sigsize: the size of sig on entry, of the signature read on return */
 static
-int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int size)
+int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int *sigsize)
 {
     uint16_t ssize;
     uint8_t  nsize;
@@ -183,7 +184,10 @@ int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int
     if (!n_stream_read_uint8(st, &nsize))
         return 0;
 
-    n_assert(namesize > nsize);
+    if (nsize >= namesize) {
+        errno = EINVAL;
+        return 0;
+    }
     if (n_stream_read(st, name, nsize) != nsize)
         return 0;
     name[nsize] = '\0';
@@ -193,9 +197,13 @@ int restore_sig(tn_stream *st, char *name, int namesize, void *sig, unsigned int
     if (!n_stream_read_uint16(st, &ssize))
         return 0;
 
-    n_assert(size > ssize);
+    if (ssize >= *sigsize) {
+        errno = EINVAL;
+        return 0;
+    }
     if (n_stream_read(st, sig, ssize) != ssize)
         return 0;
+    *sigsize = ssize;
 
     stsize += sizeof(ssize) + ssize;
     return stsize;
@@ -229,7 +237,7 @@ int tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags)
 
 int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
 {
-    int rc = 1, size;
+    int rc = 1, size, has_md = 0;
     uint16_t size16;
     char name[32], sig[UINT16_MAX];
 
@@ -237,12 +245,18 @@ int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
     if (!n_stream_read_uint16(st, &size16))
         return 0;
 
+    if (size16 < sizeof(size16)) {
+        errno = EINVAL;
+        return 0;
+    }
+
     size16 -= sizeof(size16);
     size = size16;
 
     while (size > 0) {
+        unsigned int sigsize = sizeof(sig);
         int n;
-        n = restore_sig(st, name, sizeof(name), sig, sizeof(sig));
+        n = restore_sig(st, name, sizeof(name), sig, &sigsize);
         if (n == 0) {
             rc = 0;
             break;
@@ -255,13 +269,26 @@ int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
         }
         DBGF("%s, length=%d\n", name, n);
         if (strcmp(name, "md") == 0) {
-            n_assert (flags & TNDB_SIGN_DIGEST);
-            if (!memcpy(sign->md, sig, sizeof(sign->md))) {
+            if ((flags & TNDB_SIGN_DIGEST) == 0 || sigsize != sizeof(sign->md)) {
                 rc = 0;
+                errno = EINVAL;
                 break;
             }
+            if (has_md) {
+                rc = 0;
+                errno = EINVAL;
+                break;
+            }
+            has_md = 1;
+            memcpy(sign->md, sig, sizeof(sign->md));
         }
     }
+
+    if (rc && (flags & TNDB_SIGN_DIGEST) && !has_md) {
+        errno = EINVAL;
+        rc = 0;
+    }
+
     return rc;
 }
 
@@ -368,6 +395,16 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
     size = sizeof(hdr->hdr);
     nerr += n_stream_read(st, hdr->hdr, size) != size;
 
+    if (nerr == 0) {            /* "tndb1.0\n": any minor of our major */
+        char magic[12];
+        int n = n_snprintf(magic, sizeof(magic), "tndb%d.", TNDB_FILEFMT_MAJOR);
+
+        if (memcmp(hdr->hdr, magic, n) != 0) {
+            errno = EINVAL;
+            nerr++;
+        }
+    }
+
     if (nerr == 0 && !n_stream_read_uint8(st, &hdr->flags))
         nerr++;
 
@@ -384,6 +421,9 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
         nerr++;
 
     DBGF("nrec %u, doffs %u, errs %d\n", hdr->nrec, hdr->doffs, nerr);
+
+    if (nerr)
+        errno = EINVAL;
 
     return nerr == 0;
 }
