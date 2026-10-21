@@ -23,6 +23,7 @@
 
 
 uint32_t tndb_hash(const void *d, register uint8_t size);
+char *tndb_debug_bin2hex_s(const unsigned char *bin, int bin_size);
 
 #define TNDBSIGN_OFFSET       9 /* hdr[8] + sizeof(flags) */
 struct tndb_sign {

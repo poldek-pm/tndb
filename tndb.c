@@ -360,6 +360,8 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
 {
     int nerr = 0, size;
 
+    memset(hdr, 0, sizeof(*hdr));
+
     if (n_stream_seek(st, 0, SEEK_SET) == -1)
         return 0;
 
@@ -469,6 +471,9 @@ void tndb_free(struct tndb *db)
         n_stream_close(db->st);
         db->st = NULL;
     }
+
+    if (db->hdr.sign.ctx != NULL)    /* left by a write that did not finish */
+        tndb_sign_final(&db->hdr.sign);
 
     if (db->path != NULL) {
         free(db->path);
