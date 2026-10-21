@@ -1,6 +1,9 @@
 /* tndb_verify() takes the .md5 next to a database for granted only while
    the database keeps the size and mtime it had when the .md5 was written */
-#include <config.h>
+
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
 
 #include <fcntl.h>
 #include <limits.h>
@@ -36,7 +39,7 @@ static void create_verified(const char *path)
     db = tndb_open(path);
     expect_notnull(db);
     expect_int(tndb_verify(db), 1);     /* writes the .md5 */
-    tndb_close(db);
+    expect_int(tndb_close(db), 1);
 }
 
 static void remove_verified(const char *path)
@@ -55,7 +58,7 @@ static int verify(const char *path)
 
     expect_notnull(db);
     rc = tndb_verify(db);
-    tndb_close(db);
+    expect_int(tndb_close(db), 1);
     return rc;
 }
 
@@ -273,7 +276,7 @@ START_TEST(test_make_md5_stat_race)
     /* a .md5 keyed by the FIFO state must not be left behind */
     expect_int(access(md5path, F_OK), -1);
 
-    tndb_close(db);
+    expect_int(tndb_close(db), 1);
     free(buf);
     unlink(path);
     unlink(md5path);
@@ -338,7 +341,7 @@ START_TEST(test_verify_md5_stat_race)
        changed between stat_key() and hashing: not verified */
     expect_int(verify_with_path_swap(db, path, buf, size), 0);
 
-    tndb_close(db);
+    expect_int(tndb_close(db), 1);
     free(buf);
     unlink(path);
     unlink(md5path);
