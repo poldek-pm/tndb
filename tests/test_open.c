@@ -63,7 +63,48 @@ START_TEST(test_corrupted_signature_block)
 }
 END_TEST
 
+/* A signature block whose declared size is smaller than the 2-byte size
+   field itself: size16 -= sizeof(size16) used to underflow uint16_t and
+   the parser read the rest of the file as signature records. */
+START_TEST(test_short_signature_block)
+{
+    static const unsigned bad_sizes[] = { 0, 1 };
+    char *path = NTEST_TMPPATH("tndb_open_short_sign.db");
+    struct tndb *db;
+    unsigned char sz[2];
+    FILE *fp;
+
+    for (unsigned i = 0; i < sizeof(bad_sizes) / sizeof(bad_sizes[0]); i++) {
+        db = tndb_creat(path, -1, TNDB_SIGN_DIGEST);
+        expect_notnull(db);
+        expect_int(tndb_put(db, "key", 3, "value", 5), 1);
+        expect_int(tndb_close(db), 1);
+
+        fp = fopen(path, "r+b");
+        expect_notnull(fp);
+
+        /* cut the file right after the signature block, so that the
+           underflowed parser hits EOF instead of a bogus record */
+        expect_int(fseek(fp, 9, SEEK_SET), 0);
+        expect_int(fread(sz, 1, 2, fp), 2);
+        expect_int(ftruncate(fileno(fp), 9 + ((sz[0] << 8) | sz[1])), 0);
+
+        sz[0] = (unsigned char)(bad_sizes[i] >> 8);
+        sz[1] = (unsigned char)(bad_sizes[i] & 0xff);
+        expect_int(fseek(fp, 9, SEEK_SET), 0);
+        expect_int(fwrite(sz, 1, 2, fp), 2);
+        fclose(fp);
+
+        errno = 0;
+        expect_null(tndb_open(path));
+        expect_int(errno, EINVAL);
+    }
+    unlink(path);
+}
+END_TEST
+
 NTEST_RUNNER("tndb-open",
              test_not_a_database,
-             test_corrupted_signature_block
+             test_corrupted_signature_block,
+             test_short_signature_block
 );

@@ -245,6 +245,11 @@ int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
     if (!n_stream_read_uint16(st, &size16))
         return 0;
 
+    if (size16 < sizeof(size16)) {
+        errno = EINVAL;
+        return 0;
+    }
+
     size16 -= sizeof(size16);
     size = size16;
 
