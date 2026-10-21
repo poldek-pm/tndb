@@ -15,7 +15,7 @@
 static void create_verified(const char *path)
 {
     struct tndb *db;
-    char md5path[PATH_MAX];
+    char md5path[PATH_MAX + 4];
 
     snprintf(md5path, sizeof(md5path), "%s.md5", path);
     unlink(md5path);
@@ -37,7 +37,7 @@ static void create_verified(const char *path)
 
 static void remove_verified(const char *path)
 {
-    char md5path[PATH_MAX];
+    char md5path[PATH_MAX + 4];
 
     snprintf(md5path, sizeof(md5path), "%s.md5", path);
     unlink(md5path);
@@ -109,7 +109,7 @@ END_TEST
 START_TEST(test_md5_file_of_an_older_tndb)
 {
     char *path = NTEST_TMPPATH("tndb_verify_old.db");
-    char md5path[PATH_MAX];
+    char md5path[PATH_MAX + 4];
     struct stat st;
 
     create_verified(path);
