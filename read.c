@@ -140,7 +140,7 @@ int make_md5(const char *dbpath)
 {
     FILE            *stream;
     unsigned char   md[128];
-    char            path[PATH_MAX], key[64];
+    char            path[PATH_MAX], key[64], key2[64];
     unsigned        md_size = sizeof(md);
 
     if (!stat_key(dbpath, key, sizeof(key)))
@@ -154,6 +154,10 @@ int make_md5(const char *dbpath)
     md5hex(stream, md, &md_size);
     fclose(stream);
 
+    /* the key must describe the content that was hashed */
+    if (!stat_key(dbpath, key2, sizeof(key2)) || strcmp(key, key2) != 0)
+        return 0;
+
     if (md_size == DIGEST_SIZE_MD5 && !write_md5(path, md, key))
         return 0;
 
@@ -165,7 +169,7 @@ int verify_md5(const char *dbpath)
 {
     FILE            *stream;
     unsigned char   md1[DIGEST_SIZE_MD5 + 1];
-    char            path[PATH_MAX], key[64], line[DIGEST_SIZE_MD5 + 1 + 64 + 2];
+    char            path[PATH_MAX], key[64], key2[64], line[DIGEST_SIZE_MD5 + 1 + 64 + 2];
     unsigned        md1_size;
     int             fd, n;
 
@@ -196,6 +200,11 @@ int verify_md5(const char *dbpath)
     md1_size = sizeof(md1);
     md5hex(stream, md1, &md1_size);
     fclose(stream);
+
+    /* the key must describe the content that was hashed; if the file
+       changed meanwhile, let verify_digest() look at it again */
+    if (!stat_key(dbpath, key2, sizeof(key2)) || strcmp(key, key2) != 0)
+        return 0;
 
 #if ENABLE_TRACE
     DBGF("md5 =\n %s\n %.32s\n => %d\n", (char*)md1, line,
