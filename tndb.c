@@ -237,7 +237,7 @@ int tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags)
 
 int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
 {
-    int rc = 1, size;
+    int rc = 1, size, has_md = 0;
     uint16_t size16;
     char name[32], sig[UINT16_MAX];
 
@@ -274,12 +274,21 @@ int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
                 errno = EINVAL;
                 break;
             }
-            if (!memcpy(sign->md, sig, sizeof(sign->md))) {
+            if (has_md) {
                 rc = 0;
+                errno = EINVAL;
                 break;
             }
+            has_md = 1;
+            memcpy(sign->md, sig, sizeof(sign->md));
         }
     }
+
+    if (rc && (flags & TNDB_SIGN_DIGEST) && !has_md) {
+        errno = EINVAL;
+        rc = 0;
+    }
+
     return rc;
 }
 

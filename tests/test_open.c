@@ -103,8 +103,39 @@ START_TEST(test_short_signature_block)
 }
 END_TEST
 
+/* A database that claims TNDB_SIGN_DIGEST but has an empty signature
+   block has no "md" record.  It used to open and only fail later, in
+   tndb_verify(). */
+START_TEST(test_digest_without_md)
+{
+    char *path = NTEST_TMPPATH("tndb_open_no_md.db");
+    struct tndb *db;
+    unsigned char flags = TNDB_SIGN_DIGEST;
+    FILE *fp;
+
+    db = tndb_creat(path, -1, 0);
+    expect_notnull(db);
+    expect_int(tndb_put(db, "key", 3, "value", 5), 1);
+    expect_int(tndb_close(db), 1);
+
+    /* flags are at offset 8; an unsigned database has an empty signature
+       block (size16 == 2), so there is no "md" record to keep */
+    fp = fopen(path, "r+b");
+    expect_notnull(fp);
+    expect_int(fseek(fp, 8, SEEK_SET), 0);
+    expect_int(fwrite(&flags, 1, 1, fp), 1);
+    fclose(fp);
+
+    errno = 0;
+    expect_null(tndb_open(path));
+    expect_int(errno, EINVAL);
+    unlink(path);
+}
+END_TEST
+
 NTEST_RUNNER("tndb-open",
              test_not_a_database,
              test_corrupted_signature_block,
-             test_short_signature_block
+             test_short_signature_block,
+             test_digest_without_md
 );
