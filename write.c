@@ -28,7 +28,6 @@
 #include <trurl/narray.h>
 #include <trurl/nassert.h>
 
-#define ENABLE_TRACE 0
 #define TN_STREAM_USE_GZIO_NG 1
 #include "compiler.h"
 #include "tndb_int.h"
@@ -76,8 +75,10 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
             snprintf(mode, sizeof(mode), "wb%d", comprlevel);
     }
 
-    if ((st = n_stream_dopen(fd, mode, type)) == NULL)
+    if ((st = n_stream_dopen(fd, mode, type)) == NULL) {
+        close(fd);
         return NULL;
+    }
 
     db = tndb_new(flags);
     db->rtflags |= TNDB_R_MODE_W;
@@ -276,7 +277,7 @@ static int tndbw_close(struct tndb *db)
     type = db->st->type;
 
     if ((fdin = dup(db->st->fd)) == -1)
-        return 0;
+        goto l_end;
 
     n_stream_close(db->st);
     db->st = NULL;
@@ -286,6 +287,7 @@ static int tndbw_close(struct tndb *db)
 
     if ((db->st = n_stream_dopen(fdout, "wb", type)) == NULL)
         goto l_end;
+    fdout = -1;                 /* closed with db->st */
 
     db->hdr.doffs = tndb_hdr_store_sizeof(&db->hdr) + htt_store_size(db);
     //printf("headers = %d\n", db->hdr.doffs);
@@ -336,10 +338,10 @@ static int tndbw_close(struct tndb *db)
  l_end:
     tndb_free(db);
 
-    if (fdin > 0)
+    if (fdin >= 0)
         close(fdin);
 
-    if (fdout > 0)
+    if (fdout >= 0)
         close(fdout);
 
     return rc;
@@ -357,9 +359,6 @@ int tndb_close(struct tndb *db)
     if (db->rtflags & TNDB_R_MODE_W) {
         if ((db->rtflags & TNDB_R_UNLINKED) == 0)
             return tndbw_close(db);
-
-        else if (db->hdr.flags & TNDB_SIGN_DIGEST)
-            tndb_sign_final(&db->hdr.sign);
     }
 
     tndb_free(db);

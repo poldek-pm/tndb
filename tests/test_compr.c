@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
     printf("create\n");
     while (exts[i]) {
         const char *ext = exts[i++];
-        n_snprintf(filename, sizeof(filename), "tndb.%s", ext);
+        n_snprintf(filename, sizeof(filename), "tndb-compr.%s", ext);
         const char *path = NTEST_TMPPATH(filename);
 
         void *tt = timethis_begin();
@@ -319,7 +319,7 @@ int main(int argc, char *argv[])
     i = 0;
     while (exts[i]) {
         const char *ext = exts[i++];
-        n_snprintf(filename, sizeof(filename), "tndb.%s", ext);
+        n_snprintf(filename, sizeof(filename), "tndb-compr.%s", ext);
         const char *path = NTEST_TMPPATH(filename);
 
         void *tt = timethis_begin();
@@ -331,7 +331,7 @@ int main(int argc, char *argv[])
     printf("lookup\n");
     while (exts[i]) {
         const char *ext = exts[i++];
-        n_snprintf(filename, sizeof(filename), "tndb.%s", ext);
+        n_snprintf(filename, sizeof(filename), "tndb-compr.%s", ext);
         const char *path = NTEST_TMPPATH(filename);
 
         void *tt = timethis_begin();
@@ -343,7 +343,7 @@ int main(int argc, char *argv[])
     printf("keys\n");
     while (exts[i]) {
         const char *ext = exts[i++];
-        n_snprintf(filename, sizeof(filename), "tndb.%s", ext);
+        n_snprintf(filename, sizeof(filename), "tndb-compr.%s", ext);
         const char *path = NTEST_TMPPATH(filename);
 
         void *tt = timethis_begin();

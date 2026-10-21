@@ -51,7 +51,7 @@ static inline int verify_db(struct tndb *db)
 static
 int md5(FILE *stream, unsigned char *md, unsigned *md_size)
 {
-    unsigned char buf[1024 * 2000];
+    unsigned char buf[1024 * 64];
     EVP_MD_CTX *ctx;
     unsigned n, nn = 0;
 
@@ -335,8 +335,11 @@ int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st)
                 n = to_read;
             to_read -= n;
 
-            if (n_stream_read(st, buf, n) != n)
+            if (n_stream_read(st, buf, n) != n) {
+                tndb_sign_final(&hdr->sign);
+                hdr->sign = sign;
                 return 0;
+            }
 
             tndb_sign_update(&hdr->sign, buf, n);
         }
@@ -367,7 +370,7 @@ struct tndb *do_tndb_open(int fd, const char *path)
 
     type = tndb_detect_stream_type(path);
 
-    if (fd > 0)
+    if (fd >= 0)
         st = n_stream_dopen(fd, "rb", type);
     else
         st = n_stream_open(path, "rb", type);
@@ -434,14 +437,15 @@ int tndb_verify(struct tndb *db)
         make_md5(db->path);
     }
 
-    db->rtflags |= TNDB_R_SIGN_VRFIED;
-
     if (verify_md5(db->path)) {
         rc = 1;
     } else if (verify_digest(&db->hdr, db->offs.htt, db->st)) {
         make_md5(db->path);
         rc = 1;
     }
+
+    if (rc)
+        db->rtflags |= TNDB_R_SIGN_VRFIED;
 
     return rc;
 }
@@ -667,7 +671,7 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
             return 0;
 
         ((unsigned char *)key)[db_klen] = '\0';
-        DBGF("key[%d] %s(%d)\n", it->_off, key, db_klen);
+        DBGF("key[%d] %s(%d)\n", it->_off, (char *)key, db_klen);
     }
 
     it->_off += db_klen + 1;
@@ -676,7 +680,7 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
     if (!nn_stream_read_uint32_offs(st, &vlen32, it->_off))
         return 0;
 
-    DBGF("vlen of key %s = %d\n", key ? key : "(null)", vlen32);
+    DBGF("vlen of key %s = %d\n", key ? (char *)key : "(null)", vlen32);
 
     *vlen = vlen32;
     it->_off += *vlen + sizeof(uint32_t);
@@ -720,7 +724,7 @@ int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
     if (!tndb_it_get_voff(it, key, klen, &voff, &vlen))
         return 0;
 
-    DBGF("%s avlen %d\n", key, *avlen);
+    DBGF("%s avlen %d\n", key ? (char *)key : "(null)", *avlen);
     if ((vlen + 1) > *avlen) {
         DBGF("realloc avlen=%d, vlen=%d\n", *avlen, vlen);
         *val = n_realloc(*val, vlen + 1);
