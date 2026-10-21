@@ -20,7 +20,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <utime.h>
 #include <fcntl.h>
 
 #include <openssl/evp.h>
@@ -107,26 +106,45 @@ int md5hex(FILE *stream, unsigned char *mdhex, unsigned *mdhex_size)
     return *mdhex_size;
 }
 
+#define DIGEST_SIZE_MD5  32
+
+/* the .md5 next to a database holds its md5 followed by the size and the
+   mtime the database had then: while they match, it is not read again */
 static
-time_t util_mtime(const char *path)
+int stat_key(const char *path, char *key, size_t key_size)
 {
     struct stat st;
 
     if (stat(path, &st) != 0)
         return 0;
 
-    return st.st_mtime;
+    n_snprintf(key, key_size, "%lld %lld.%09ld", (long long)st.st_size,
+               (long long)st.st_mtim.tv_sec, (long)st.st_mtim.tv_nsec);
+    return 1;
 }
 
-#define DIGEST_SIZE_MD5  32
+static
+int write_md5(const char *path, const unsigned char *md, const char *key)
+{
+    FILE *f;
+
+    if ((f = fopen(path, "w")) == NULL)
+        return 0;
+
+    fprintf(f, "%s %s\n", (const char *)md, key);
+    return fclose(f) == 0;
+}
 
 static
 int make_md5(const char *dbpath)
 {
     FILE            *stream;
     unsigned char   md[128];
-    char            path[PATH_MAX];
+    char            path[PATH_MAX], key[64], key2[64];
     unsigned        md_size = sizeof(md);
+
+    if (!stat_key(dbpath, key, sizeof(key)))
+        return 0;
 
     if ((stream = fopen(dbpath, "r")) == NULL)
         return 0;
@@ -136,18 +154,12 @@ int make_md5(const char *dbpath)
     md5hex(stream, md, &md_size);
     fclose(stream);
 
-    if (md_size == DIGEST_SIZE_MD5) {
-        struct utimbuf ut;
-        FILE *f;
+    /* the key must describe the content that was hashed */
+    if (!stat_key(dbpath, key2, sizeof(key2)) || strcmp(key, key2) != 0)
+        return 0;
 
-        if ((f = fopen(path, "w")) == NULL)
-            return 0;
-        fprintf(f, "%s", md);
-        fclose(f);
-
-        ut.actime = ut.modtime = util_mtime(dbpath);
-        utime(path, &ut);
-    }
+    if (md_size == DIGEST_SIZE_MD5 && !write_md5(path, md, key))
+        return 0;
 
     return md_size;
 }
@@ -156,26 +168,31 @@ static
 int verify_md5(const char *dbpath)
 {
     FILE            *stream;
-    unsigned char   md1[DIGEST_SIZE_MD5 + 1], md2[DIGEST_SIZE_MD5 + 1];
-    unsigned        md1_size, md2_size;
-    char            path[PATH_MAX];
-    int             fd;
+    unsigned char   md1[DIGEST_SIZE_MD5 + 1];
+    char            path[PATH_MAX], key[64], key2[64], line[DIGEST_SIZE_MD5 + 1 + 64 + 2];
+    unsigned        md1_size;
+    int             fd, n;
 
     snprintf(path, sizeof(path), "%s.md5", dbpath);
 
-    /* check mtimes first */
-    time_t db_mtime = util_mtime(dbpath);
-    if (db_mtime > 0 && db_mtime == util_mtime(path))
-        return 1;
+    if (!stat_key(dbpath, key, sizeof(key)))
+        return 0;
 
     if ((fd = open(path, O_RDONLY)) < 0)
         return 0;
 
-    md2_size = read(fd, md2, sizeof(md2));
+    n = read(fd, line, sizeof(line) - 1);
     close(fd);
 
-    if (md2_size != DIGEST_SIZE_MD5)
+    if (n < DIGEST_SIZE_MD5)
         return 0;
+
+    line[n] = '\0';
+    if (n > 0 && line[n - 1] == '\n')
+        line[n - 1] = '\0';
+
+    if (line[DIGEST_SIZE_MD5] == ' ' && strcmp(line + DIGEST_SIZE_MD5 + 1, key) == 0)
+        return 1;
 
     if ((stream = fopen(dbpath, "r")) == NULL)
         return 0;
@@ -184,21 +201,21 @@ int verify_md5(const char *dbpath)
     md5hex(stream, md1, &md1_size);
     fclose(stream);
 
+    /* the key must describe the content that was hashed; if the file
+       changed meanwhile, let verify_digest() look at it again */
+    if (!stat_key(dbpath, key2, sizeof(key2)) || strcmp(key, key2) != 0)
+        return 0;
+
 #if ENABLE_TRACE
-    DBGF("md5 =\n %s\n %s\n => %d\n",
-         (char*)tndb_debug_bin2hex_s(md1, md1_size),
-         (char*)tndb_debug_bin2hex_s(md2, md2_size),
-         memcmp(md1, md2, md1_size));
+    DBGF("md5 =\n %s\n %.32s\n => %d\n", (char*)md1, line,
+         memcmp(md1, line, md1_size));
 #endif
 
-    int ok = (md1_size == DIGEST_SIZE_MD5 && md1_size == md2_size &&
-              memcmp(md1, md2, DIGEST_SIZE_MD5) == 0);
+    int ok = (md1_size == DIGEST_SIZE_MD5 &&
+              memcmp(md1, line, DIGEST_SIZE_MD5) == 0);
 
-    if (ok) {
-        struct utimbuf ut;
-        ut.actime = ut.modtime = db_mtime;
-        utime(path, &ut);
-    }
+    if (ok)                     /* the content is the same, note its stat */
+        write_md5(path, md1, key);
 
     return ok;
 }
