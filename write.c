@@ -75,8 +75,10 @@ struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
             snprintf(mode, sizeof(mode), "wb%d", comprlevel);
     }
 
-    if ((st = n_stream_dopen(fd, mode, type)) == NULL)
+    if ((st = n_stream_dopen(fd, mode, type)) == NULL) {
+        close(fd);
         return NULL;
+    }
 
     db = tndb_new(flags);
     db->rtflags |= TNDB_R_MODE_W;
