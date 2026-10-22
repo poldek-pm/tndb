@@ -39,7 +39,10 @@ EXPORT struct tndb *tndb_creat(const char *name, int comprlevel, unsigned flags)
 EXPORT int tndb_put(struct tndb *db, const char *key, unsigned int klen,
 		    const void *val, unsigned int vlen);
 
-/* opens *existing* database */
+/* opens *existing* database
+
+   tndb_dopen() takes ownership of fd: tndb_close() closes it on success and
+   tndb_dopen() itself closes it on failure. */
 EXPORT struct tndb *tndb_open(const char *path);
 EXPORT struct tndb *tndb_dopen(int fd, const char *path);
 

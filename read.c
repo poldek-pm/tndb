@@ -370,13 +370,17 @@ struct tndb *do_tndb_open(int fd, const char *path)
 
     type = tndb_detect_stream_type(path);
 
-    if (fd >= 0)
+    if (fd >= 0) {
         st = n_stream_dopen(fd, "rb", type);
-    else
+        if (st == NULL) {
+            close(fd);
+            return NULL;
+        }
+    } else {
         st = n_stream_open(path, "rb", type);
-
-    if (st == NULL)
-        return NULL;
+        if (st == NULL)
+            return NULL;
+    }
 
     if (!tndb_hdr_restore(&hdr, st)) {
         n_stream_close(st);
