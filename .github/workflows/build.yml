@@ -1,0 +1,47 @@
+name: build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/poldek-pm/pld-devel:latest
+    env:
+      LANG: C
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: tndb
+    - uses: actions/checkout@v4
+      with:
+        repository: poldek-pm/trurlib
+        path: trurlib
+    - name: git safe dir
+      run: |
+        git config --global --add safe.directory $(pwd)/tndb
+        git config --global --add safe.directory $(pwd)/trurlib
+    - name: build trurlib
+      working-directory: trurlib
+      run: |
+        ./autogen.sh
+        make
+    - name: autogen tndb
+      working-directory: tndb
+      run: ./autogen.sh --enable-strict
+    - name: make tndb
+      working-directory: tndb
+      run: make CFLAGS="-O0"
+    - name: make check tndb
+      working-directory: tndb
+      run: make CFLAGS="-O0" check
+    - name: save test log
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-suite.log
+        path: tndb/tests/test-suite.log
+        retention-days: 7
