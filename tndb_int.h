@@ -18,23 +18,29 @@
 #include <trurl/nstream.h>
 #include <trurl/nmalloc.h>
 
+#include "tndb.h"
+
 #define TNDB_FILEFMT_MAJOR     1
 #define TNDB_FILEFMT_MINOR     0
-
 
 uint32_t tndb_hash(const void *d, register uint8_t size);
 char *tndb_debug_bin2hex_s(const unsigned char *bin, int bin_size);
 
 #define TNDBSIGN_OFFSET       9 /* hdr[8] + sizeof(flags) */
 struct tndb_sign {
-    void           *ctx;
-    unsigned char  md[20];      /* sha */
+    void           *ctx;        /* sha1 */
+    void           *ctx256;     /* sha256 */
+    unsigned char  md[20];      /* sha1 */
+    unsigned char  md256[32];   /* sha256 */
+    void           *pgp;        /* raw OpenPGP signature */
+    size_t         pgp_len;
 };
 
 void tndb_sign_init(struct tndb_sign *sign);
 void tndb_sign_update(struct tndb_sign *sign, const void *buf, unsigned int size);
 void tndb_sign_update_int32(struct tndb_sign *sign, uint32_t v);
 void tndb_sign_final(struct tndb_sign *sign);
+void tndb_sign_clear(struct tndb_sign *sign);
 int  tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags);
 
 
@@ -97,6 +103,9 @@ struct tndb {
     char                     errmsg[128];
     tn_alloc                 *na;
     int                      _refcnt;
+
+    tndb_sign_fn             sign_fn;
+    void                     *sign_data;
 };
 
 struct tndb *tndb_new(unsigned flags);

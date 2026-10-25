@@ -304,6 +304,22 @@ static int tndbw_close(struct tndb *db)
         tndb_sign_final(&db->hdr.sign);
     }
 
+    if (db->hdr.flags & TNDB_SIGN_OPENPGP) {
+        void *sig = NULL;
+        size_t siglen = 0;
+
+        if (db->sign_fn == NULL ||
+            !db->sign_fn(db->hdr.sign.md256, sizeof(db->hdr.sign.md256),
+                         &sig, &siglen, db->sign_data) ||
+            sig == NULL || siglen == 0 || siglen > TNDB_PGP_SIG_MAX) {
+            free(sig);
+            goto l_end;
+        }
+
+        db->hdr.sign.pgp = sig;
+        db->hdr.sign.pgp_len = siglen;
+    }
+
     if (!tndb_hdr_store(&db->hdr, db->st))
         goto l_end;
 

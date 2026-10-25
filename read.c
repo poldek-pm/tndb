@@ -307,7 +307,8 @@ static int htt_read(struct tndb *db)
 }
 
 static
-int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st)
+int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st,
+                  tndb_verify_sign_fn verify_fn, void *verify_data)
 {
     unsigned char buf[4096];
     struct tndb_sign sign;
@@ -352,10 +353,27 @@ int verify_digest(struct tndb_hdr *hdr, uint32_t htt_offset, tn_stream *st)
          (char*)tndb_debug_bin2hex_s(sign.md, sizeof(sign.md)),
          memcmp(sign.md, hdr->sign.md, 1));
 
-    rc = 0;
-    if (memcmp(sign.md, hdr->sign.md, sizeof(sign.md)) == 0)
-        rc = 1;
+    rc = 1;
+    if (memcmp(sign.md, hdr->sign.md, sizeof(sign.md)) != 0) {
+        rc = 0;
+        goto l_end;
+    }
 
+    if ((hdr->flags & TNDB_SIGN_SHA256) &&
+        memcmp(sign.md256, hdr->sign.md256, sizeof(sign.md256)) != 0) {
+        rc = 0;
+        goto l_end;
+    }
+
+    if ((hdr->flags & TNDB_SIGN_OPENPGP) && verify_fn != NULL) {
+        if (sign.pgp == NULL || sign.pgp_len == 0)
+            rc = 0;
+        else
+            rc = verify_fn(hdr->sign.md256, sizeof(hdr->sign.md256),
+                           sign.pgp, sign.pgp_len, verify_data);
+    }
+
+l_end:
     hdr->sign = sign;
     return rc;
 }
@@ -435,19 +453,62 @@ struct tndb *tndb_dopen(int fd, const char *path)
 
 int tndb_verify(struct tndb *db)
 {
+    unsigned flags, digest_flags;
     int rc = 0;
 
-    if ((db->hdr.flags & TNDB_SIGN_DIGEST) == 0) { /* created w/o digest */
+    if (db == NULL)
+        return 0;
+
+    flags = tndb_signature_flags(db);
+    digest_flags = flags & (TNDB_SIGN_DIGEST | TNDB_SIGN_SHA256);
+
+    if (digest_flags == 0) {
+        /* unsigned database: keep the historical .md5 cache path */
         make_md5(db->path);
+        rc = verify_md5(db->path);
+        if (rc)
+            db->rtflags |= TNDB_R_SIGN_VRFIED;
+        return rc;
     }
 
+    /* Try the .md5 fast path first for any database that has an embedded
+       digest.  Full digest (and optional OpenPGP) verification is done only
+       when the cache miss. */
     if (verify_md5(db->path)) {
         rc = 1;
-    } else if (verify_digest(&db->hdr, db->offs.htt, db->st)) {
+    } else if (tndb_verify_signature(db, digest_flags, NULL, NULL)) {
         make_md5(db->path);
         rc = 1;
     }
 
+    if (rc)
+        db->rtflags |= TNDB_R_SIGN_VRFIED;
+
+    return rc;
+}
+
+int tndb_verify_signature(struct tndb *db, unsigned flags,
+                          tndb_verify_sign_fn fn, void *data)
+{
+    unsigned available;
+    int rc;
+
+    if (db == NULL || flags == 0)
+        return 0;
+
+    if (flags & TNDB_SIGN_OPENPGP)
+        flags |= TNDB_SIGN_SHA256;
+
+    available = tndb_signature_flags(db);
+    if ((available & flags) != flags)
+        return 0;
+
+    if ((flags & TNDB_SIGN_OPENPGP) && fn == NULL)
+        return 0;
+
+    rc = verify_digest(&db->hdr, db->offs.htt, db->st,
+                       (flags & TNDB_SIGN_OPENPGP) ? fn : NULL,
+                       data);
     if (rc)
         db->rtflags |= TNDB_R_SIGN_VRFIED;
 

@@ -86,20 +86,26 @@ char *tndb_debug_bin2hex_s(const unsigned char *bin, int bin_size)
 //static
 void tndb_sign_init(struct tndb_sign *sign)
 {
-    EVP_MD_CTX *ctx;
+    EVP_MD_CTX *ctx, *ctx256;
 
     memset(sign, 0, sizeof(*sign));
 
     ctx = EVP_MD_CTX_create();
     EVP_DigestInit(ctx, EVP_sha1());
     sign->ctx = ctx;
+
+    ctx256 = EVP_MD_CTX_create();
+    EVP_DigestInit(ctx256, EVP_sha256());
+    sign->ctx256 = ctx256;
     //printf("%p %p >> INIT\n", sign, sign->ctx);
 }
 
 void tndb_sign_update(struct tndb_sign *sign, const void *buf, unsigned int size)
 {
     n_assert(sign->ctx);
+    n_assert(sign->ctx256);
     EVP_DigestUpdate(sign->ctx, buf, size);
+    EVP_DigestUpdate(sign->ctx256, buf, size);
     //printf(" >> UPDATE %d (%s)\n", size, tndb_debug_bin2hex_s(buf, size));
 }
 
@@ -117,16 +123,37 @@ void tndb_sign_final(struct tndb_sign *sign)
     unsigned n;
 
     //printf("%p %p >> FINAL\n", sign, sign->ctx);
-    EVP_DigestFinal(sign->ctx, buf, &n);
+    if (sign->ctx) {
+        EVP_DigestFinal(sign->ctx, buf, &n);
+        if (n > sizeof(sign->md))
+            *sign->md = '\0';
+        else
+            memcpy(sign->md, buf, n);
+        EVP_MD_CTX_destroy((EVP_MD_CTX *)sign->ctx);
+        sign->ctx = NULL;
+    }
 
-    if (n > (int)sizeof(sign->md))
-        *sign->md = '\0';
-    else
-        memcpy(sign->md, buf, n);
+    if (sign->ctx256) {
+        EVP_DigestFinal(sign->ctx256, buf, &n);
+        if (n > sizeof(sign->md256))
+            *sign->md256 = '\0';
+        else
+            memcpy(sign->md256, buf, n);
+        EVP_MD_CTX_destroy((EVP_MD_CTX *)sign->ctx256);
+        sign->ctx256 = NULL;
+    }
+}
 
-    EVP_MD_CTX_destroy((EVP_MD_CTX *)sign->ctx);
-    sign->ctx = NULL;
+void tndb_sign_clear(struct tndb_sign *sign)
+{
+    if (sign->ctx || sign->ctx256)
+        tndb_sign_final(sign);
 
+    if (sign->pgp) {
+        free(sign->pgp);
+        sign->pgp = NULL;
+        sign->pgp_len = 0;
+    }
 }
 
 
@@ -139,6 +166,13 @@ int tndb_sign_store_sizeof(struct tndb_sign *sign, uint32_t flags)
     if (flags & TNDB_SIGN_DIGEST)
         size += sizeof(uint8_t) + strlen("md") +
             sizeof(uint16_t) + sizeof(sign->md);
+    if (flags & TNDB_SIGN_SHA256)
+        size += sizeof(uint8_t) + strlen("sha256") +
+            sizeof(uint16_t) + sizeof(sign->md256);
+    if (flags & TNDB_SIGN_OPENPGP)
+        size += sizeof(uint8_t) + strlen("pgp") +
+            sizeof(uint16_t) + TNDB_PGP_SIG_MAX +
+            sizeof(uint8_t) + strlen("pad") + sizeof(uint16_t);
     return size;
 }
 
@@ -230,6 +264,31 @@ int tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags)
         stsize += n;
     }
 
+    if (flags & TNDB_SIGN_SHA256) {
+        int n;
+        if ((n = store_sig(st, "sha256", sign->md256,
+                           sizeof(sign->md256))) == 0)
+            return 0;
+        stsize += n;
+    }
+
+    if (flags & TNDB_SIGN_OPENPGP) {
+        unsigned char pad[TNDB_PGP_SIG_MAX] = {0};
+        int n, padlen;
+
+        if (sign->pgp == NULL || sign->pgp_len == 0 ||
+            sign->pgp_len > TNDB_PGP_SIG_MAX)
+            return 0;
+        if ((n = store_sig(st, "pgp", sign->pgp, sign->pgp_len)) == 0)
+            return 0;
+        stsize += n;
+
+        padlen = TNDB_PGP_SIG_MAX - sign->pgp_len;
+        if ((n = store_sig(st, "pad", pad, padlen)) == 0)
+            return 0;
+        stsize += n;
+    }
+
     n_assert((int)sizeof(uint16_t) + stsize == size);
     return 1;
 }
@@ -237,7 +296,7 @@ int tndb_sign_store(struct tndb_sign *sign, tn_stream *st, uint32_t flags)
 
 int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
 {
-    int rc = 1, size, has_md = 0;
+    int rc = 1, size, has_md = 0, has_sha256 = 0, has_pgp = 0;
     uint16_t size16;
     char name[32], sig[UINT16_MAX];
 
@@ -269,18 +328,40 @@ int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
         }
         DBGF("%s, length=%d\n", name, n);
         if (strcmp(name, "md") == 0) {
-            if ((flags & TNDB_SIGN_DIGEST) == 0 || sigsize != sizeof(sign->md)) {
-                rc = 0;
-                errno = EINVAL;
-                break;
-            }
-            if (has_md) {
+            if ((flags & TNDB_SIGN_DIGEST) == 0 ||
+                sigsize != sizeof(sign->md) || has_md) {
                 rc = 0;
                 errno = EINVAL;
                 break;
             }
             has_md = 1;
             memcpy(sign->md, sig, sizeof(sign->md));
+
+        } else if (strcmp(name, "sha256") == 0) {
+            if ((flags & TNDB_SIGN_SHA256) == 0 ||
+                sigsize != sizeof(sign->md256) || has_sha256) {
+                rc = 0;
+                errno = EINVAL;
+                break;
+            }
+            has_sha256 = 1;
+            memcpy(sign->md256, sig, sizeof(sign->md256));
+
+        } else if (strcmp(name, "pgp") == 0) {
+            if ((flags & TNDB_SIGN_OPENPGP) == 0 || has_pgp ||
+                sigsize == 0) {
+                rc = 0;
+                errno = EINVAL;
+                break;
+            }
+            sign->pgp = malloc(sigsize);
+            if (sign->pgp == NULL) {
+                rc = 0;
+                break;
+            }
+            memcpy(sign->pgp, sig, sigsize);
+            sign->pgp_len = sigsize;
+            has_pgp = 1;
         }
     }
 
@@ -288,15 +369,35 @@ int tndb_sign_restore(tn_stream *st, struct tndb_sign *sign, uint32_t flags)
         errno = EINVAL;
         rc = 0;
     }
+    if (rc && (flags & TNDB_SIGN_SHA256) && !has_sha256) {
+        errno = EINVAL;
+        rc = 0;
+    }
+    if (rc && (flags & TNDB_SIGN_OPENPGP) &&
+        (!has_pgp || !has_sha256)) {
+        errno = EINVAL;
+        rc = 0;
+    }
+
+    if (!rc && sign->pgp) {
+        free(sign->pgp);
+        sign->pgp = NULL;
+        sign->pgp_len = 0;
+    }
 
     return rc;
 }
 
-
 void tndb_hdr_init(struct tndb_hdr *hdr, unsigned flags)
 {
+    if (flags & TNDB_SIGN_OPENPGP)
+        flags |= TNDB_SIGN_DIGEST | TNDB_SIGN_SHA256;
+
+    if (flags & TNDB_SIGN_SHA256)
+        flags |= TNDB_SIGN_DIGEST;
+
     memset(hdr, 0, sizeof(*hdr));
-    hdr->flags |= flags;
+    hdr->flags = flags;
 
     /* avoid format-truncation warn */
     char hdrbuf[12];
@@ -307,7 +408,8 @@ void tndb_hdr_init(struct tndb_hdr *hdr, unsigned flags)
     memcpy(hdr->hdr, hdrbuf, sizeof(hdr->hdr));
     DBGF("hdrbuf [%s] [%s]\n", hdrbuf, hdr->hdr);
 
-    if (flags & TNDB_SIGN_DIGEST)
+    if (flags & (TNDB_SIGN_DIGEST | TNDB_SIGN_SHA256 |
+                 TNDB_SIGN_OPENPGP))
         tndb_sign_init(&hdr->sign);
 }
 
@@ -422,8 +524,10 @@ int tndb_hdr_restore(struct tndb_hdr *hdr, tn_stream *st)
 
     DBGF("nrec %u, doffs %u, errs %d\n", hdr->nrec, hdr->doffs, nerr);
 
-    if (nerr)
+    if (nerr) {
+        tndb_sign_clear(&hdr->sign);
         errno = EINVAL;
+    }
 
     return nerr == 0;
 }
@@ -512,8 +616,10 @@ void tndb_free(struct tndb *db)
         db->st = NULL;
     }
 
-    if (db->hdr.sign.ctx != NULL)    /* left by a write that did not finish */
-        tndb_sign_final(&db->hdr.sign);
+    if (db->hdr.sign.ctx != NULL ||
+        db->hdr.sign.ctx256 != NULL || /* left by a write that did not finish */
+        db->hdr.sign.pgp != NULL)
+        tndb_sign_clear(&db->hdr.sign);
 
     if (db->path != NULL) {
         free(db->path);
@@ -525,6 +631,25 @@ void tndb_free(struct tndb *db)
         db->na = NULL;
     }
     free(db);
+}
+
+int tndb_set_sign_fn(struct tndb *db, tndb_sign_fn fn, void *data)
+{
+    if (db == NULL)
+        return 0;
+
+    db->sign_fn = fn;
+    db->sign_data = data;
+    return 1;
+}
+
+unsigned tndb_signature_flags(const struct tndb *db)
+{
+    if (db == NULL)
+        return 0;
+
+    return db->hdr.flags & (TNDB_SIGN_DIGEST | TNDB_SIGN_SHA256 |
+                            TNDB_SIGN_OPENPGP);
 }
 
 const char *tndb_path(const struct tndb *db)
