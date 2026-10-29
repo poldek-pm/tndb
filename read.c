@@ -53,7 +53,7 @@ int md5(FILE *stream, unsigned char *md, unsigned *md_size)
 {
     unsigned char buf[1024 * 64];
     EVP_MD_CTX *ctx;
-    unsigned n, nn = 0;
+    unsigned n;
 
     n_assert(md_size && *md_size);
 
@@ -63,10 +63,8 @@ int md5(FILE *stream, unsigned char *md, unsigned *md_size)
         return 0;
     }
 
-    while ((n = fread(buf, 1, sizeof(buf), stream)) > 0) {
+    while ((n = fread(buf, 1, sizeof(buf), stream)) > 0)
         EVP_DigestUpdate(ctx, buf, n);
-        nn += n;
-    }
 
     EVP_DigestFinal(ctx, buf, &n);
 

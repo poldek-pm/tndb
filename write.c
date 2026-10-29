@@ -266,7 +266,7 @@ static int htt_compute_digest(struct tndb *db)
 
 static int tndbw_close(struct tndb *db)
 {
-    ssize_t nread, ntotal;
+    ssize_t nread;
     char   buf[1024 * 16];
     int    fdin = -1, fdout = -1, type, rc;
 
@@ -325,11 +325,9 @@ static int tndbw_close(struct tndb *db)
     if (lseek(fdout, 0, SEEK_END) == -1)
         goto l_end;
 
-    ntotal = 0;
     while ((nread = read(fdin, buf, sizeof(buf))) > 0) {
         if (write(fdout, buf, nread) != (int)nread)
             goto l_end;
-        ntotal += nread;
     }
 
     if (nread != -1)
