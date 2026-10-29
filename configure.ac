@@ -32,6 +32,14 @@ AC_SUBST(LT_REVISION)
 AC_SUBST(LT_AGE)
 
 AM_CFLAGS="-Wall -W"
+
+AC_ARG_ENABLE(strict, AS_HELP_STRING([--enable-strict], [Enable strict compilation options]), enable_strict=$enableval,
+                                                         enable_strict=no)
+if test x$enable_strict != xno; then
+    if test -n "$GCC"; then
+        AM_CFLAGS="$AM_CFLAGS -Werror"
+    fi
+fi
 AC_SUBST(AM_CFLAGS)
 
 if test -n "$GCC"; then
