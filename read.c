@@ -14,6 +14,7 @@
 # include "config.h"
 #endif
 
+#include <errno.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
@@ -463,6 +464,41 @@ tn_stream *tndb_tn_stream(const struct tndb *db)
     return db->st;
 }
 
+/* offsets in a file are 32-bit, those of a corrupted record can add up to more */
+static inline int record_fits(uint32_t offs, uint8_t klen, uint32_t vlen)
+{
+    return (uint64_t)offs + sizeof(klen) + klen + sizeof(vlen) + vlen <= UINT32_MAX;
+}
+
+/* reads the value length of the record at offs; 0 if the record does not fit */
+static int read_vlen(tn_stream *st, uint32_t offs, uint8_t klen,
+                     uint32_t *voff, uint32_t *vlen)
+{
+    uint32_t len;
+
+    if (!record_fits(offs, klen, 0))
+        return 0;
+
+    if (!nn_stream_read_uint32_offs(st, &len, offs + sizeof(klen) + klen))
+        return 0;
+
+    if (!record_fits(offs, klen, len))
+        return 0;
+
+    *voff = offs + sizeof(klen) + klen + sizeof(len);
+    *vlen = len;
+    return 1;
+}
+
+/* moves the stream to off, the end of a value it skips; 0 if the file ends
+   before it, which a seek alone does not tell */
+static int skip_to(tn_stream *st, uint32_t off)
+{
+    unsigned char c;
+
+    return n_stream_seek(st, off - 1, SEEK_SET) != -1 && n_stream_read(st, &c, 1) == 1;
+}
+
 int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
                   uint32_t *voffs, unsigned int *vlen)
 {
@@ -529,16 +565,21 @@ int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
             continue;
         }
 
-        if (read_eq(db, he->offs + sizeof(klen), key, klen)) {
-            uint32_t len;
-            found = 1;
+        if (!record_fits(he->offs, klen, 0)) {
+            found = -1;
+            break;
+        }
 
-            *voffs = he->offs + sizeof(uint8_t) + klen;
-            if (nn_stream_read_uint32_offs(db->st, &len, *voffs))
+        if (read_eq(db, he->offs + sizeof(klen), key, klen)) {
+            uint32_t voff, len;
+
+            if (read_vlen(db->st, he->offs, klen, &voff, &len)) {
+                found = 1;
+                *voffs = voff;
                 *vlen = len;
-            else
+            } else {
                 found = -1;
-            *voffs += sizeof(uint32_t);
+            }
         }
     }
 
@@ -552,7 +593,7 @@ int tndb_get(struct tndb *db, const void *key, unsigned int klen,
     unsigned int vlen;
     int          nread = 0;
 
-    if (tndb_get_voff(db, key, klen, &voffs, &vlen) && vlen < valsize) {
+    if (tndb_get_voff(db, key, klen, &voffs, &vlen) > 0 && vlen < valsize) {
         nread = nn_stream_read_offs(db->st, val, vlen, voffs);
         if (nread != (int)vlen)
             nread = 0;
@@ -568,7 +609,7 @@ size_t tndb_get_all(struct tndb *db, const void *key, size_t klen,
     size_t nread = 0;
     unsigned int vlen;
 
-    if (tndb_get_voff(db, key, klen, &voffs, &vlen)) {
+    if (tndb_get_voff(db, key, klen, &voffs, &vlen) > 0) {
 	*val = n_malloc(vlen + 1); /* extra byte for \0 */
 
 	nread = nn_stream_read_offs(db->st, *val, vlen, voffs);
@@ -610,17 +651,21 @@ tn_array *tndb_keys(struct tndb *db)
         return NULL;
 
     keys = n_array_new(db->hdr.nrec, free, (tn_fn_cmp)strcmp);
-    while ((rc = tndb_it_get_voff(&it, key, &klen, &voffs, &vlen))) {
-        if (rc < 0) {
-            n_array_free(keys);
-            return NULL;
-        }
-
+    while ((rc = tndb_it_get_voff(&it, key, &klen, &voffs, &vlen)) > 0)
         n_array_push(keys, n_strdupl(key, klen));
+
+    if (rc < 0) {
+        n_array_free(keys);
+        return NULL;
     }
 
     return keys;
 }
+
+/* struct tndb_it::_state */
+#define IT_NEXT     0          /* on the next record */
+#define IT_IN_VALUE 1          /* between tndb_it_get_begin() and _end() */
+#define IT_BROKEN   (-1)       /* a reader returned -1 */
 
 int tndb_it_start(struct tndb *db, struct tndb_it *it)
 {
@@ -634,11 +679,52 @@ int tndb_it_start(struct tndb *db, struct tndb_it *it)
     it->_nrec = 0;
     it->_off = db->hdr.doffs;
     DBGF("data offset %d\n", db->hdr.doffs);
-    it->_get_flag = 0;
+    it->_state = IT_NEXT;
 
     return 1;
 }
 
+
+static int it_broken(struct tndb_it *it, int err)
+{
+    it->_state = IT_BROKEN;
+    errno = err;
+    return -1;
+}
+
+/* -1 leaves an empty key behind, not what the failed read left in it: a
+   caller that tests the result for truth takes it for a record */
+static int it_broken_key(struct tndb_it *it, int err, void *key, unsigned int *klen)
+{
+    if (key)
+        ((unsigned char *)key)[0] = '\0';
+
+    if (klen)
+        *klen = 0;
+
+    return it_broken(it, err);
+}
+
+/* and an empty value; size is what the buffer holds */
+static void clear_val(void *val, size_t size, unsigned int *avlen)
+{
+    if (val != NULL && size > 0)
+        ((char *)val)[0] = '\0';
+    *avlen = 0;
+}
+
+/* after the last record: the last value ends the data, and a read of it
+   leaves the stream there; a value only skipped is checked (a backward
+   seek of a compressed stream reads it again from its start) */
+static int it_end(struct tndb_it *it, void *key, unsigned int *klen)
+{
+    long pos = n_stream_tell(it->_db->st);
+
+    if ((pos >= 0 && (uint64_t)pos == it->_off) || skip_to(it->_db->st, it->_off))
+        return 0;
+
+    return it_broken_key(it, EBADMSG, key, klen);
+}
 
 /*
   key size must be at least 256 + 1 bytes (maximum tndb key length)
@@ -651,18 +737,28 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
     uint32_t vlen32 = 0;
     tn_stream *st;
 
-    n_assert(it->_get_flag == 0);
-
-    if (key)
+    if (klen)
         *klen = 0;
+    *voff = 0;
+    *vlen = 0;
+
+    /* -1 was returned once, the iteration is over: a loop that tests the
+       result for truth stops here */
+    if (it->_state == IT_BROKEN) {
+        if (key)
+            ((unsigned char *)key)[0] = '\0';
+        return 0;
+    }
+
+    n_assert(it->_state == IT_NEXT);
 
     if (it->_nrec == it->_db->hdr.nrec)
-        return 0;
+        return it_end(it, key, klen);
 
     st = it->_db->st;
 
     if (nn_stream_read_offs(st, &db_klen, 1, it->_off) != 1)
-        return 0;
+        return it_broken_key(it, EBADMSG, key, klen);
 
     if (klen)
         *klen = db_klen;
@@ -670,25 +766,22 @@ int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
     DBGF("get %d of %d\n", it->_nrec, it->_db->hdr.nrec);
     if (key) {
         if (n_stream_read(st, key, db_klen) != db_klen)
-            return 0;
+            return it_broken_key(it, EBADMSG, key, klen);
 
         ((unsigned char *)key)[db_klen] = '\0';
         DBGF("key[%d] %s(%d)\n", it->_off, (char *)key, db_klen);
     }
 
-    it->_off += db_klen + 1;
-    *voff = it->_off + sizeof(uint32_t);
-
-    if (!nn_stream_read_uint32_offs(st, &vlen32, it->_off))
-        return 0;
+    if (!read_vlen(st, it->_off, db_klen, voff, &vlen32))
+        return it_broken_key(it, EBADMSG, key, klen);
 
     DBGF("vlen of key %s = %d\n", key ? (char *)key : "(null)", vlen32);
 
     *vlen = vlen32;
-    it->_off += *vlen + sizeof(uint32_t);
+    it->_off = *voff + vlen32;
     it->_nrec++;
     //DBGF("val[%d] (%d)\n", it->_offs, *vlen);
-    return *vlen;
+    return 1;
 }
 
 
@@ -697,22 +790,29 @@ int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
 {
     uint32_t     voff;
     unsigned int vlen;
-    int          rc = 0;
+    int          rc;
 
-    if (!tndb_it_get_voff(it, key, klen, &voff, &vlen))
-        return 0;
-
-    if ((vlen + 1) > *avlen) {
-        n_die("tndb: not enough space for data (%d > %d)\n", vlen, *avlen);
-        return 0;
+    if ((rc = tndb_it_get_voff(it, key, klen, &voff, &vlen)) <= 0) {
+        if (rc < 0)
+            clear_val(val, *avlen, avlen);
+        return rc;
     }
 
-    *avlen = vlen;
-    rc = (n_stream_read(it->_db->st, val, vlen) == (int)vlen);
-    if (rc)
-        ((char*)val)[vlen] = '\0';
+    /* the length comes from the file: a value that does not fit is an
+       error like any other, not a reason to end the program */
+    if (vlen >= *avlen) {
+        clear_val(val, *avlen, avlen);
+        return it_broken_key(it, ERANGE, key, klen);
+    }
 
-    return rc;
+    if (n_stream_read(it->_db->st, val, vlen) != (int)vlen) {
+        clear_val(val, *avlen, avlen);
+        return it_broken_key(it, EBADMSG, key, klen);
+    }
+
+    ((char*)val)[vlen] = '\0';
+    *avlen = vlen;
+    return 1;
 }
 
 int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
@@ -720,24 +820,31 @@ int tndb_it_rget(struct tndb_it *it, void *key, unsigned int *klen,
 {
     uint32_t     voff;
     unsigned int vlen;
-    int          rc = 0;
+    size_t       size = *avlen;
+    int          rc;
 
 
-    if (!tndb_it_get_voff(it, key, klen, &voff, &vlen))
-        return 0;
-
-    DBGF("%s avlen %d\n", key ? (char *)key : "(null)", *avlen);
-    if ((vlen + 1) > *avlen) {
-        DBGF("realloc avlen=%d, vlen=%d\n", *avlen, vlen);
-        *val = n_realloc(*val, vlen + 1);
+    if ((rc = tndb_it_get_voff(it, key, klen, &voff, &vlen)) <= 0) {
+        if (rc < 0)
+            clear_val(*val, size, avlen);
+        return rc;
     }
 
-    *avlen = vlen;
-    rc = (n_stream_read(it->_db->st, *val, vlen) == (int)vlen);
-    if (rc)
-        ((char*)*val)[vlen] = '\0';
+    DBGF("%s avlen %d\n", key ? (char *)key : "(null)", *avlen);
+    if (vlen >= *avlen) {
+        DBGF("realloc avlen=%d, vlen=%d\n", *avlen, vlen);
+        size = (size_t)vlen + 1;
+        *val = n_realloc(*val, size);
+    }
 
-    return rc;
+    if (n_stream_read(it->_db->st, *val, vlen) != (int)vlen) {
+        clear_val(*val, size, avlen);
+        return it_broken_key(it, EBADMSG, key, klen);
+    }
+
+    ((char*)*val)[vlen] = '\0';
+    *avlen = vlen;
+    return 1;
 }
 
 int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,
@@ -745,37 +852,47 @@ int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,
 {
     uint32_t     voff = 0;
     unsigned int vlen = 0;
+    int          rc;
 
-    n_assert(it->_get_flag == 0);
+    rc = tndb_it_get_voff(it, key, klen, &voff, &vlen);
 
-    if (!tndb_it_get_voff(it, key, klen, &voff, &vlen))
-        return 0;
-
-    n_stream_seek(it->_db->st, voff, SEEK_SET);
-    it->_get_flag = 1;
-
+    /* 0 unless rc is 1: tndb_it_get_voff() zeroes vlen */
     if (avlen)
         *avlen = vlen;
+
+    if (rc <= 0)
+        return rc;
+
+    n_stream_seek(it->_db->st, voff, SEEK_SET);
+    it->_state = IT_IN_VALUE;
     //printf("tndb_it_get_begin %lu + %lu => %lu\n", voff, vlen, it->_off);
     return 1;
 }
 
 int tndb_it_get_end(struct tndb_it *it)
 {
-    uint32_t off = n_stream_tell(it->_db->st);
+    uint32_t off;
+
+    /* after a -1 of tndb_it_get_begin(), for a caller that took it for 1 */
+    if (it->_state == IT_BROKEN)
+        return 0;
+
+    n_assert(it->_state == IT_IN_VALUE);
+    off = n_stream_tell(it->_db->st);
 
     if (off > it->_off) {
         n_die("tndb_it_get_end: current offset is %u, expected %u\n", off,
                it->_off);
+        it_broken(it, EBADMSG);
         return 0;
     }
 
-    if (off < it->_off)
-        n_stream_seek(it->_db->st, it->_off, SEEK_SET);
+    if (off < it->_off && !skip_to(it->_db->st, it->_off)) {
+        it_broken(it, EBADMSG);
+        return 0;
+    }
 
-    n_assert(it->_get_flag > 0);
-    it->_get_flag = 0;
-
+    it->_state = IT_NEXT;
     return 1;
 }
 

@@ -9,6 +9,7 @@ config.status
 stamp-h.in
 config.h
 config.h.in
+/version.h
 stamp-h
 missing
 mkinstalldirs

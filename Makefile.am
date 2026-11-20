@@ -25,6 +25,9 @@ libtndb_includedir = $(includedir)/tndb
 libtndb_include_HEADERS =					\
 	tndb.h							\
 	$(NULL)
+nodist_libtndb_include_HEADERS =				\
+	version.h						\
+	$(NULL)
 
 noinst_PROGRAMS =						\
 	tndb_dump						\

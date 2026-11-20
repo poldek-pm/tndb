@@ -1,8 +1,8 @@
 # Process this file with autoconf to produce a configure script.
 
 m4_define([tndb_major_version], [0])
-m4_define([tndb_minor_version], [1])
-m4_define([tndb_micro_version], [1])
+m4_define([tndb_minor_version], [2])
+m4_define([tndb_micro_version], [0])
 m4_define([tndb_version],
           [tndb_major_version.tndb_minor_version.tndb_micro_version])
 
@@ -23,13 +23,18 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_RANLIB
 
-# libtool versioning
-LT_CURRENT=2
+# libtool versioning; 3: the iterating readers return -1 for a broken record
+LT_CURRENT=3
 LT_REVISION=0
-LT_AGE=2
+LT_AGE=0
 AC_SUBST(LT_CURRENT)
 AC_SUBST(LT_REVISION)
 AC_SUBST(LT_AGE)
+
+# for version.h
+AC_SUBST([TNDB_VERSION_MAJOR], [tndb_major_version])
+AC_SUBST([TNDB_VERSION_MINOR], [tndb_minor_version])
+AC_SUBST([TNDB_VERSION_MICRO], [tndb_micro_version])
 
 AM_CFLAGS="-Wall -W"
 
@@ -106,6 +111,7 @@ AM_CONDITIONAL(HAVE_CHECK, test x"$have_check" = x"yes")
 
 AC_CONFIG_FILES([
 Makefile
+version.h
 data/Makefile
 data/tndb.pc
 tests/Makefile

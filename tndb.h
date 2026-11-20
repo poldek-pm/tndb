@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "version.h"
+
 #define TNDB_KEY_MAX 255
 
 #include <trurl/nstream.h>
@@ -81,6 +83,8 @@ EXPORT size_t tndb_get_all(struct tndb *db, const void *key, size_t klen,
 EXPORT int tndb_get_str(struct tndb *db, const char *key,
 			unsigned char *val, unsigned int valsize);
 
+/* 1 if found, 0 if not, -1 for a record that cannot be read or that ends
+   past the 32-bit offsets of the file */
 EXPORT int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
 			 uint32_t *voffs, unsigned int *vlen);
 
@@ -93,7 +97,7 @@ struct tndb_it {
     struct tndb  *_db;
     uint32_t     _nrec;
     uint32_t     _off;
-    int          _get_flag;     /* for get_(begin/end) */
+    int          _state;        /* on a record, in its value, or broken */
 };
 
 #define tndb_it_stream(db) ((db)->st)
@@ -102,8 +106,20 @@ struct tndb_it {
 EXPORT int tndb_it_start(struct tndb *db, struct tndb_it *it);
 
 /*
+  readers: 1 for a record, 0 at the end, -1 for a broken record (EBADMSG);
+  -1 ends the iteration, a reader called after it returns 0; with -1 the
+  key, and the value of tndb_it_get() and tndb_it_rget(), are empty
+  (*klen and *vlen are 0), so the broken record is named by the one before
+  it. tndb_it_get_voff() reports 0 in *klen, *voff and *vlen unless it
+  returns 1, tndb_it_get_begin() in *klen and *vlen; tndb_it_get() and
+  tndb_it_rget() zero *vlen only with -1 and leave it as it was on 0
+ */
+
+/*
   key size must be at least TNDB_KEY_MAX + 1 bytes
   if key is NULL then keys are not retrieved
+  *vlen is the size of val, then the length of the value;
+  -1 with ERANGE if the value does not fit (see tndb_it_rget())
  */
 EXPORT int tndb_it_get(struct tndb_it *it, void *key, unsigned int *klen,
 		       void *val, unsigned int *vlen);
@@ -118,9 +134,12 @@ EXPORT int tndb_it_get_voff(struct tndb_it *it, void *key, unsigned int *klen,
 /* for reading directly from db's stream */
 EXPORT int tndb_it_get_begin(struct tndb_it *it, void *key, unsigned int *klen,
             		     unsigned int *vlen);
+/* skips the rest of the value; 0 if the file ends before it, which ends
+   the iteration */
 EXPORT int tndb_it_get_end(struct tndb_it *it);
 
 
+/* NULL for a broken database */
 EXPORT tn_array *tndb_keys(struct tndb *db);
 
 /* number of records */
