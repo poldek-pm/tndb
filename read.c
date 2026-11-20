@@ -40,8 +40,11 @@ static inline int verify_db(struct tndb *db)
     if (db->rtflags & TNDB_R_SIGN_VRFIED)
         return 1;
 
+    if (db->rtflags & TNDB_R_SIGN_BROKEN)     /* asked before */
+        return 0;
+
     if (db->hdr.flags & TNDB_SIGNED)
-        return tndb_verify(db);
+        return tndb_verify(db);               /* records the answer */
 
     n_assert(0);
     db->rtflags |= TNDB_R_SIGN_VRFIED;
@@ -238,10 +241,14 @@ int read_eq(const struct tndb *db, const uint32_t offs,
     return memcmp(buf, str, len) == 0;
 }
 
+/* the size of a hash table comes from the file: its array starts this small
+   and n_array_push() grows it as the entries are read */
+#define HT_INIT_SIZE 1024
+
 static int htt_read(struct tndb *db)
 {
     int i, j;
-    uint32_t ht_offsets[TNDB_HTSIZE];
+    uint32_t ht_offsets[TNDB_HTSIZE], nleft, nrec_left;
 
     /* read ht entries offsets first to avoid backward file seek */
 
@@ -259,6 +266,14 @@ static int htt_read(struct tndb *db)
         ht_offsets[i] = ht_offs;
     }
 
+    /* offsets, a size per table, then 8 bytes an entry up to the data */
+    if (db->hdr.doffs < db->offs.htt + 2 * TNDB_HTBYTESIZE)
+        return 0;
+    nleft = (db->hdr.doffs - db->offs.htt - 2 * TNDB_HTBYTESIZE) /
+        (2 * sizeof(uint32_t));
+    /* and a record has one entry */
+    nrec_left = db->hdr.nrec;
+
     for (i=0; i < TNDB_HTSIZE; i++) {
         tn_array *ht = db->htt[i];
         uint32_t ht_size;
@@ -271,14 +286,21 @@ static int htt_read(struct tndb *db)
         if (!nn_stream_read_uint32_offs(db->st, &ht_size, ht_offs))
             return 0;
 
-        if (ht_size == 0) {
-            DBGF("empty!? %d\n", i);
-            n_assert(0);
-            continue;
+        /* tndb points at no table of size 0: a file that does, or that
+           has more entries than room for them, or more than records, is
+           broken */
+        if (ht_size == 0 || ht_size > nleft || ht_size > nrec_left) {
+            DBGF("table %d: size %u, room for %u, records left %u\n", i,
+                 ht_size, nleft, nrec_left);
+            return 0;
         }
+        nleft -= ht_size;
+        nrec_left -= ht_size;
 
         if (ht == NULL) {
-            ht = n_array_new(ht_size, tndb_hent_free, (tn_fn_cmp)tndb_hent_cmp);
+            /* the size is the file's: do not allocate it up front */
+            ht = n_array_new(ht_size < HT_INIT_SIZE ? ht_size : HT_INIT_SIZE,
+                             tndb_hent_free, (tn_fn_cmp)tndb_hent_cmp);
             db->htt[i] = ht;
         }
 
@@ -447,8 +469,15 @@ int tndb_verify(struct tndb *db)
         rc = 1;
     }
 
-    if (rc)
+    if (rc) {
         db->rtflags |= TNDB_R_SIGN_VRFIED;
+        db->rtflags &= ~TNDB_R_SIGN_BROKEN;
+
+    } else if (db->hdr.flags & TNDB_SIGNED) {
+        /* only these are checked by a lookup */
+        db->rtflags &= ~TNDB_R_SIGN_VRFIED;
+        db->rtflags |= TNDB_R_SIGN_BROKEN;
+    }
 
     return rc;
 }
@@ -508,26 +537,36 @@ int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
     uint8_t                  klen;
     int                      n, found = 0;
 
-
-    if (!verify_db(db))
-        return 0;
-
-    if (db->hdr.flags & TNDB_NOHASH)
-        n_die("tndb: method not allowed on file without hash table\n");
-
-
-    if ((db->rtflags & TNDB_R_HTT_LOADED) == 0) {
-        if (!htt_read(db))
-            n_die("tndb: %p, htt_read failed\n", db);
-        //printf("tndb: %p, htt_read OK\n", db);
-        db->rtflags |= TNDB_R_HTT_LOADED;
-    }
-
     *voffs = 0;
     *vlen = 0;
 
-    if (aklen > UINT8_MAX)
+    /* the caller's key, before the tables are read for it */
+    if (aklen > UINT8_MAX) {
         n_die("tndb: key too long (max is %d)\n", UINT8_MAX);
+        return -1;
+    }
+
+    if (!verify_db(db))
+        return -1;
+
+    if (db->hdr.flags & TNDB_NOHASH) {
+        n_die("tndb: method not allowed on file without hash table\n");
+        return -1;
+    }
+
+    if ((db->rtflags & TNDB_R_HTT_LOADED) == 0) {
+        if (db->rtflags & TNDB_R_HTT_BROKEN)     /* reported once, not read again */
+            return -1;
+
+        /* tables read in part stay unused until tndb_free() */
+        if (!htt_read(db)) {
+            db->rtflags |= TNDB_R_HTT_BROKEN;
+            n_die("tndb: %s: htt_read failed\n", tndb_path(db));
+            return -1;
+        }
+        //printf("tndb: %p, htt_read OK\n", db);
+        db->rtflags |= TNDB_R_HTT_LOADED;
+    }
 
     klen = aklen;
 

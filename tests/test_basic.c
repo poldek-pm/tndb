@@ -183,6 +183,8 @@ START_TEST(test_corrupted_database)
     char *key = "signed_key";
     char *val = "signed_value";
     char *path = NTEST_TMPPATH("tndb_corrupted.db");
+    unsigned int vlen;
+    uint32_t voffs;
     FILE *fp;
     long filesize;
 
@@ -215,8 +217,131 @@ START_TEST(test_corrupted_database)
 
     /* Verify should fail for corrupted database */
     expect_int(tndb_verify(db), 0);
+
+    /* a lookup fails, rather than finds no such key */
+    expect_int(tndb_get_voff(db, key, strlen(key), &voffs, &vlen), -1);
     expect_int(tndb_close(db), 1);
     unlink(path);
+}
+END_TEST
+
+/* the verification that a lookup makes is remembered, failures too: a
+   database repaired under the handle stays broken until tndb_verify() asks
+   again, and one corrupted under it is broken once tndb_verify() says so */
+START_TEST(test_corrupted_database_remembered)
+{
+    struct tndb *db;
+    char *key = "signed_key";
+    char *val = "signed_value";
+    char *path = NTEST_TMPPATH("tndb_corrupted_mem.db");
+    char *md5path = NTEST_TMPPATH("tndb_corrupted_mem.db.md5");
+    char buf[64];
+    unsigned int vlen;
+    uint32_t voffs;
+    FILE *fp;
+    long filesize;
+    int original, n;
+
+    unlink(path);
+    unlink(md5path);
+
+    db = tndb_creat(path, -1, TNDB_SIGN_DIGEST);
+    expect_notnull(db);
+    expect_int(tndb_put(db, key, strlen(key), val, strlen(val)), 1);
+    expect_int(tndb_close(db), 1);
+
+    /* corrupt a byte, keeping it to repair the file later */
+    fp = fopen(path, "r+b");
+    expect_notnull(fp);
+    fseek(fp, 0, SEEK_END);
+    filesize = ftell(fp);
+    fail_unless(filesize > 100, "a file of %ld bytes", filesize);
+    fseek(fp, filesize / 2, SEEK_SET);
+    original = fgetc(fp);
+    fail_unless(original != EOF, "read at %ld: %m", filesize / 2);
+    fseek(fp, filesize / 2, SEEK_SET);
+    fputc(original ^ 0xff, fp);
+    fclose(fp);
+
+    db = tndb_open(path);
+    expect_notnull(db);
+
+    /* the lookup cannot be made */
+    expect_int(tndb_get_voff(db, key, strlen(key), &voffs, &vlen), -1);
+
+    /* the file is as it was, and the answer is remembered */
+    fp = fopen(path, "r+b");
+    expect_notnull(fp);
+    fseek(fp, filesize / 2, SEEK_SET);
+    fputc(original, fp);
+    fclose(fp);
+    expect_int(tndb_get_voff(db, key, strlen(key), &voffs, &vlen), -1);
+
+    /* tndb_verify() asks again */
+    expect_int(tndb_verify(db), 1);
+    n = tndb_get(db, key, strlen(key), buf, sizeof(buf));
+    expect_int(n, (int)strlen(val));
+    buf[n] = '\0';
+    expect_str(buf, val);
+
+    /* and its failure ends a success: the file corrupted under the handle.
+       The .md5 that the success wrote goes, as within one tick of the
+       clock it would describe the corrupted file as well */
+    unlink(md5path);
+    fp = fopen(path, "r+b");
+    expect_notnull(fp);
+    fseek(fp, filesize / 2, SEEK_SET);
+    fputc(original ^ 0xff, fp);
+    fclose(fp);
+    expect_int(tndb_verify(db), 0);
+    expect_int(tndb_get_voff(db, key, strlen(key), &voffs, &vlen), -1);
+
+    expect_int(tndb_close(db), 1);
+    unlink(path);
+    unlink(md5path);
+}
+END_TEST
+
+/* tndb_verify() of a database without a digest must not stop the lookups:
+   only a signed database is checked by a lookup, and a .md5 that cannot be
+   written or read (here a directory of that name) makes it fail */
+START_TEST(test_verify_unsigned_keeps_lookups)
+{
+    struct tndb *db;
+    char *key = "unsigned_key";
+    char *val = "unsigned_value";
+    char *path = NTEST_TMPPATH("tndb_unverified.db");
+    char *md5path = NTEST_TMPPATH("tndb_unverified.db.md5");
+    char buf[64];
+    unsigned int vlen;
+    uint32_t voffs;
+    int n;
+
+    unlink(path);
+    rmdir(md5path);
+
+    db = tndb_creat(path, -1, 0);
+    expect_notnull(db);
+    expect_int(tndb_put(db, key, strlen(key), val, strlen(val)), 1);
+    expect_int(tndb_close(db), 1);
+
+    expect_int(mkdir(md5path, 0755), 0);
+    db = tndb_open(path);
+    expect_notnull(db);
+
+    /* the side-car cannot be made, so the check fails ... */
+    expect_int(tndb_verify(db), 0);
+
+    /* ... and the lookups do not depend on it */
+    expect_int(tndb_get_voff(db, key, strlen(key), &voffs, &vlen), 1);
+    n = tndb_get(db, key, strlen(key), buf, sizeof(buf));
+    expect_int(n, (int)strlen(val));
+    buf[n] = '\0';
+    expect_str(buf, val);
+
+    expect_int(tndb_close(db), 1);
+    unlink(path);
+    rmdir(md5path);
 }
 END_TEST
 
@@ -307,6 +432,8 @@ NTEST_RUNNER("tndb-basic",
              test_multiple_records,
              test_signed_database,
              test_corrupted_database,
+             test_corrupted_database_remembered,
+             test_verify_unsigned_keeps_lookups,
              test_refcount,
              test_path_and_stream,
              test_keys_api

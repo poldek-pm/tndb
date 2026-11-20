@@ -143,8 +143,10 @@ static inline int put_key(struct tndb *db, const char *key, unsigned int aklen)
 
     n_assert(db->rtflags & TNDB_R_MODE_W);
 
-    if (aklen > UINT8_MAX)
+    if (aklen > UINT8_MAX) {
         n_die("Key is too long (max is %d)\n", UINT8_MAX);
+        return 0;
+    }
     klen = aklen;
 
     if ((db->hdr.flags & TNDB_NOHASH) == 0) {

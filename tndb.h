@@ -59,6 +59,9 @@ EXPORT int tndb_close(struct tndb *db);
 /* unlinks && _closes_ db */
 EXPORT int tndb_unlink(struct tndb *db);
 
+/* for a signed database the answer is remembered for the handle: one that
+   fails stays broken for the lookups after it, until tndb_verify() is called
+   again; without a digest the lookups do not depend on it */
 EXPORT int tndb_verify(struct tndb *db);
 
 EXPORT struct tndb *tndb_ref(struct tndb *db);
@@ -83,8 +86,10 @@ EXPORT size_t tndb_get_all(struct tndb *db, const void *key, size_t klen,
 EXPORT int tndb_get_str(struct tndb *db, const char *key,
 			unsigned char *val, unsigned int valsize);
 
-/* 1 if found, 0 if not, -1 for a record that cannot be read or that ends
-   past the 32-bit offsets of the file */
+/* 1 if found, 0 if not, -1 if the lookup cannot be made: a database that
+   fails verification or is made with TNDB_NOHASH, a key longer than
+   TNDB_KEY_MAX, a hash table or a record that cannot be read, a record
+   that ends past the 32-bit offsets of the file */
 EXPORT int tndb_get_voff(struct tndb *db, const void *key, unsigned int aklen,
 			 uint32_t *voffs, unsigned int *vlen);
 
