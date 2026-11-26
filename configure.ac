@@ -31,11 +31,6 @@ AC_SUBST(LT_CURRENT)
 AC_SUBST(LT_REVISION)
 AC_SUBST(LT_AGE)
 
-# for version.h
-AC_SUBST([TNDB_VERSION_MAJOR], [tndb_major_version])
-AC_SUBST([TNDB_VERSION_MINOR], [tndb_minor_version])
-AC_SUBST([TNDB_VERSION_MICRO], [tndb_micro_version])
-
 AM_CFLAGS="-Wall -W"
 
 AC_ARG_ENABLE(strict, AS_HELP_STRING([--enable-strict], [Enable strict compilation options]), enable_strict=$enableval,
@@ -111,7 +106,6 @@ AM_CONDITIONAL(HAVE_CHECK, test x"$have_check" = x"yes")
 
 AC_CONFIG_FILES([
 Makefile
-version.h
 data/Makefile
 data/tndb.pc
 tests/Makefile

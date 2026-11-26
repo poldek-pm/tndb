@@ -17,8 +17,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "version.h"
-
 #define TNDB_KEY_MAX 255
 
 #include <trurl/nstream.h>
